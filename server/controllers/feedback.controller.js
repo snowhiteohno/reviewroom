@@ -15,7 +15,7 @@ export async function updateComment(req,res){const data=parse(z.object({action:z
  if(data.action==="address"){
   requireEditor(role);if(c.resolution==="verified")throw new ApiError(409,"Reopen this conversation before linking another fix.");
   if(!data.versionId)throw new ApiError(400,"Choose the revision containing the fix.");
-  const [source,target]=await Promise.all([Version.findById(c.versionId).session(session),Version.findOne({_id:data.versionId,projectId:project._id}).session(session)]);
+  const source=await Version.findById(c.versionId).session(session);const target=await Version.findOne({_id:data.versionId,projectId:project._id}).session(session);
   if(!target||target.number<=source.number)throw new ApiError(400,"Link a later revision to show what changed.");
   c.resolution="addressed";c.addressedVersionId=target._id;c.addressedBy=req.user._id;c.verifiedBy=null;c.resolved=false;note="Marked feedback as addressed in version "+target.number;
  }else if(data.action==="verify"){
