@@ -33,7 +33,10 @@ export async function json(request: Request) {
   if (Number(request.headers.get("content-length")) > 30000)
     throw new ApiError(413, "This request is too large.");
   try {
-    return (await request.json()) as Record<string, unknown>;
+    const value: unknown = await request.json();
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Expected an object");
+    return value as Record<string, unknown>;
   } catch {
     throw new ApiError(400, "Please check the submitted information.");
   }
