@@ -42,9 +42,12 @@ import {
 import Review from "./Review";
 import {projectAction} from "./lib/api";
 import {useAuth} from "./lib/auth";
+import {useNavigate,useLocation} from "react-router-dom";
 type View = "all" | "shared" | "starred" | "activity" | "archive";
 export default function Studio({ user }: { user: User }) {
  const {logout}=useAuth();
+ const navigate=useNavigate(),route=useLocation();
+ useEffect(()=>setSelected(new URLSearchParams(route.search).get("project")),[route.search]);
   const [projects, setProjects] = useState<Project[]>([]),
     [activity, setActivity] = useState<Activity[]>([]),
     [loading, setLoading] = useState(true),
@@ -90,10 +93,6 @@ export default function Studio({ user }: { user: User }) {
         if (active) setLoading(false);
       }
     })();
-    const sync = () =>
-      setSelected(new URLSearchParams(location.search).get("project"));
-    sync();
-    window.addEventListener("popstate", sync);
     const key = (e: KeyboardEvent) => {
       if (
         e.key === "/" &&
@@ -107,7 +106,6 @@ export default function Studio({ user }: { user: User }) {
     window.addEventListener("keydown", key);
     return () => {
       active = false;
-      window.removeEventListener("popstate", sync);
       window.removeEventListener("keydown", key);
     };
   }, [refresh]);
@@ -150,7 +148,7 @@ export default function Studio({ user }: { user: User }) {
     const u = new URL(location.href);
     if (id) u.searchParams.set("project", id);
     else u.searchParams.delete("project");
-    history.pushState({}, "", u);
+    navigate("/"+u.search);
   }
   function nav(v: View) {
     setView(v);
