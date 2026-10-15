@@ -44,6 +44,7 @@ import {
   date,
   relative,
 } from "@/components/studio-ui";
+import BeforeAfter from "@/components/BeforeAfter";
 import DesignVotes from "@/components/DesignVotes";
 import {FeedbackFlow,FixesPanel} from "@/components/FeedbackFlow";
 type Props = {
@@ -84,6 +85,7 @@ export default function Review({
     [uploading, setUploading] = useState(false),
     [menu, setMenu] = useState(false),
     [versionPanel, setVersionPanel] = useState(true);
+  const [comparisonMode,setComparisonMode]=useState<"side"|"reveal">("side");
   const [kind,setKind]=useState<"suggestion"|"must_fix">("suggestion");
   const blockers=d.blockers||[];
   const input = useRef<HTMLInputElement>(null),
@@ -377,9 +379,10 @@ export default function Review({
               </button>
             </div>
           </div>
+          {compare&&older&&<div className="comparison-controls"><div className="compare-mode-switch"><button className={comparisonMode==="side"?"active":""} aria-pressed={comparisonMode==="side"} onClick={()=>setComparisonMode("side")}>Side by side</button><button className={comparisonMode==="reveal"?"active":""} aria-pressed={comparisonMode==="reveal"} onClick={()=>setComparisonMode("reveal")}>Reveal changes</button></div>{comparisonMode==="reveal"&&<select aria-label="Before version" value={older.id} onChange={e=>setLeftVersion(e.target.value)}>{d.versions.filter(v=>v.id!==current?.id).map(v=><option key={v.id} value={v.id}>Before: version {v.number}</option>)}</select>}</div>}
           {current ? (
             <div className={"canvas-viewport " + (pinMode ? "pin-cursor" : "")}>
-              <div
+              {compare&&comparisonMode==="reveal"&&older?<BeforeAfter key={older.id+current.id} before={older} after={current}/>:<div
                 className={compare ? "comparison" : "single-design"}
                 style={compare ? {} : { width: zoom * 100 + "%" }}
               >
@@ -472,7 +475,7 @@ export default function Review({
                     )}
                   </div>
                 </div>
-              </div>
+              </div>}
               {pinMode && (
                 <div className="pin-instruction">
                   Click a spot on the design, then leave your feedback.
