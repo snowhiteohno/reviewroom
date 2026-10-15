@@ -1,10 +1,57 @@
+<div align="center">
+
 # ReviewRoom
 
-A design review studio built with **MongoDB, Express, React, and Node.js**.
+A thoughtful space for designs, feedback, and the next version.
 
-Upload a design, collect feedback at specific points, link a revision to each fix, and get the final version approved. The interface uses cream, dusty rose, sage, and paper-inspired details.
+**MongoDB · Express · React · Node.js**
 
-Built for [Mallika’s personal account](https://github.com/snowhiteohno). The repository is public. The application runs locally and has not been published through another hosting account.
+[Explore the studio](#a-look-inside) · [Try the demo](#try-a-review-together) · [Run locally](#run-locally) · [Deploy](#deploy-on-render) · [Syllabus map](#syllabus-map)
+
+Made by [Mallika](https://github.com/snowhiteohno)
+
+</div>
+
+Upload a design, leave feedback exactly where it belongs, and follow each fix through to approval. Cream, dusty rose, sage, and paper-inspired details keep the workspace calm.
+
+## A look inside
+
+[![ReviewRoom studio with six pastel design project cards](docs/images/studio.png)](docs/images/studio.png)
+
+Click any screenshot to see it at full size. Open a feature below for a closer look.
+
+<details>
+<summary><strong>Follow a comment from feedback to a verified fix</strong></summary>
+
+A designer links a revision to a must fix. Another reviewer verifies the change before the project can be approved.
+
+[![Linked feedback, a revision, and independent verification](docs/images/fixes.png)](docs/images/fixes.png)
+
+[Explore the feedback workflow](#feedback-to-fix)
+
+</details>
+
+<details>
+<summary><strong>Vote on a design before seeing what everyone else chose</strong></summary>
+
+Choose between two or three directions. Results stay hidden until you cast your vote or the poll closes.
+
+[![A blind design vote with version choices](docs/images/votes.png)](docs/images/votes.png)
+
+[Explore blind voting](#blind-design-voting)
+
+</details>
+
+<details>
+<summary><strong>Reveal what changed between two versions</strong></summary>
+
+Drag the comparison divider, or focus it and use the arrow keys, to reveal the revised design.
+
+[![Before and after comparison with a draggable divider](docs/images/reveal.png)](docs/images/reveal.png)
+
+[Explore the comparison slider](#before-and-after-reveal)
+
+</details>
 
 ## Three features to try
 
@@ -48,7 +95,7 @@ The starter projects and sample comments are labeled as samples. Their artwork i
 | Server         | Node.js, Express 5, MVC folders                         |
 | Database       | MongoDB with Mongoose                                   |
 | Authentication | bcrypt, jsonwebtoken, cookie-parser, revocable sessions |
-| Uploads        | Multer, Sharp, private filesystem storage               |
+| Uploads        | Multer, Sharp, MongoDB GridFS in production             |
 | Validation     | Zod, Mongoose schemas, database indexes                 |
 | Testing        | Node test runner, Supertest, Playwright                 |
 
@@ -69,13 +116,17 @@ With no MONGODB_URI set, the development script starts a dedicated local MongoDB
 
 The development script starts the Express API on port 5180 and the React client on port 5174. Vite proxies API requests so cookies stay on the same origin.
 
-### Use MongoDB Atlas instead
+<details>
+<summary><strong>Use MongoDB Atlas instead of a local database</strong></summary>
 
 Copy .env.example to .env and fill in MONGODB_URI with your own Atlas connection string. Then run npm run dev. Local MongoDB startup is skipped when a URI is provided.
 
 Use a replica set or Atlas. ReviewRoom uses transactions to keep feedback, approvals, membership changes, votes, and version numbers consistent.
 
-### Local data
+</details>
+
+<details>
+<summary><strong>Where does my local data live?</strong></summary>
 
 - .data/mongo: local MongoDB data.
 - .data/uploads: private uploaded images.
@@ -84,22 +135,29 @@ Use a replica set or Atlas. ReviewRoom uses transactions to keep feedback, appro
 
 These paths, .env files, test artifacts, and browser screenshots are ignored by Git. Local data survives application restarts.
 
-## A demo you can present
+</details>
 
-1. Register a designer account and a reviewer account in separate browser profiles.
-2. Create a project and upload a design.
-3. Add the reviewer’s email through Share, then send them the copied link.
-4. As the reviewer, pin a Must fix comment on the design.
-5. As the designer, upload a revision and open Fixes.
-6. Select Link a fix and choose the later revision.
-7. Request a review. Approval stays disabled until verification.
-8. As the reviewer, verify the linked revision and approve it.
-9. Open Compare and switch to Reveal changes.
-10. Open Votes, start a blind vote, and show how results appear after voting.
+## Try a review together
+
+Follow this walkthrough in two browser profiles, one for a designer and one for a reviewer.
+
+- [ ] Register a designer account and a reviewer account in separate browser profiles.
+- [ ] Create a project and upload a design.
+- [ ] Add the reviewer’s email through Share, then send them the copied link.
+- [ ] As the reviewer, pin a Must fix comment on the design.
+- [ ] As the designer, upload a revision and open Fixes.
+- [ ] Select Link a fix and choose the later revision.
+- [ ] Request a review. Approval stays disabled until verification.
+- [ ] As the reviewer, verify the linked revision and approve it.
+- [ ] Open Compare and switch to Reveal changes.
+- [ ] Open Votes, start a blind vote, and show how results appear after voting.
 
 A sample Flora project includes two revisions, an addressed sample fix, and a blind vote so you can explore these features immediately.
 
 ## Roles
+
+<details>
+<summary><strong>Who can do what?</strong></summary>
 
 | Action                          | Owner | Editor                   | Reviewer |
 | ------------------------------- | ----- | ------------------------ | -------- |
@@ -117,6 +175,8 @@ A sample Flora project includes two revisions, an addressed sample fix, and a bl
 A person cannot verify their own fix. Ordinary suggestions can be resolved directly by an editor, owner, or their author. Must fix items require the linked-revision verification flow.
 
 Sharing records access; it does not send email. The teammate registers or signs in with the email added to the project. Removing membership immediately removes access to files and project operations.
+
+</details>
 
 ## How it works
 
@@ -136,7 +196,7 @@ Projects have embedded membership records. Versions, comments, polls, votes, fav
 
 Every project mutation first writes the project’s revision inside a transaction. Concurrent writes therefore conflict and retry safely. Approval checks and feedback verification run in that same transaction, preventing a competing blocker from being ignored.
 
-Version numbers use a project counter protected by the transaction and a unique project-number index. Failed database operations remove the newly written image file.
+Version numbers use a project counter protected by the transaction and a unique project-number index. Failed database operations remove the newly stored image.
 
 Pinned coordinates are normalized from zero to one relative to the image. They remain aligned while the canvas resizes and zooms.
 
@@ -158,6 +218,9 @@ Pinned coordinates are normalized from zero to one relative to the image. They r
 | Transactions and concurrency      | Safe version numbering, approval gates, and duplicate voting protection |
 
 ## API overview
+
+<details>
+<summary><strong>Browse the REST endpoints</strong></summary>
 
 | Method       | Endpoint                              | Purpose                                       |
 | ------------ | ------------------------------------- | --------------------------------------------- |
@@ -181,6 +244,8 @@ Pinned coordinates are normalized from zero to one relative to the image. They r
 | POST         | /api/projects/:id/polls/:pollId/votes | Cast one vote                                 |
 | PATCH        | /api/projects/:id/polls/:pollId/close | Close voting and reveal results               |
 
+</details>
+
 ## Tests and checks
 
 ```sh
@@ -189,7 +254,7 @@ npm run build
 npm test
 ```
 
-The API suite uses Supertest and a real MongoDB replica set. It creates a uniquely named reviewroom_test database, checks its name before cleanup, and drops only that database. It covers password hashing, session revocation, access controls, private files, concurrent uploads, feedback isolation, independent verification, approval races, blind voting, cross-project options, membership removal, and idempotent sample setup.
+The API suite uses Supertest and a real MongoDB replica set. It creates a uniquely named reviewroom_test database, checks its name before cleanup, and drops only that database. It covers password hashing, session revocation, access controls, private files, GridFS persistence and cleanup, concurrent uploads, feedback isolation, independent verification, approval races, blind voting, cross-project options, membership removal, and idempotent sample setup.
 
 For browser tests, keep npm run dev running and start Chrome with remote debugging enabled:
 
@@ -208,11 +273,27 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-Set MONGODB_URI, APP_ORIGIN, and a random JWT_SECRET of at least 32 characters in the hosting environment. Production authentication cookies require HTTPS. Use persistent storage for UPLOAD_DIR and keep it outside public static files. Express serves the compiled React client and API from the same origin.
+Set MONGODB_URI, APP_ORIGIN, and a random JWT_SECRET of at least 32 characters in the hosting environment. Production authentication cookies require HTTPS. Express serves the compiled React client and API from the same origin.
 
-The application is currently kept local, as requested. No external hosting account is required for development.
+Production uploads default to MongoDB GridFS. Uploaded images stay in the database across deployments and restarts, and each download still requires project membership. Local development defaults to filesystem storage. Set UPLOAD_STORAGE explicitly to gridfs or filesystem to choose a backend. Filesystem hosting requires a persistent UPLOAD_DIR outside public static files.
+
+### Deploy on Render
+
+[Create a Render deployment](https://render.com/deploy?repo=https://github.com/snowhiteohno/reviewroom) from the included render.yaml using your personal Render account.
+
+1. Create a MongoDB Atlas cluster and a database user with read and write access to the reviewroom database. Add the Render service’s outbound IP addresses to the Atlas network access list.
+2. Create a Render Blueprint from this repository. Enter the Atlas connection string as MONGODB_URI, including /reviewroom as the database name. Store the connection string in Render, never in the repository.
+3. Render installs dependencies, builds React, generates JWT_SECRET, and starts Express. The blueprint selects the free web service plan, GridFS storage, and the /api/health readiness endpoint.
+4. Open the HTTPS address shown by Render and register your account. The application reads RENDER_EXTERNAL_URL automatically. Set APP_ORIGIN to your HTTPS URL if you later add a custom domain.
+
+TRUST_PROXY_HOPS is set to 1 in the Render blueprint so the server recognizes requests through Render’s proxy. Keep it at 0 when serving Node directly. Render free services can sleep when inactive; the first request may take longer.
+
+A Dockerfile is also included for hosts that run containers. Pass MONGODB_URI, APP_ORIGIN, and JWT_SECRET at runtime. The image runs as an unprivileged user and includes a database-aware health check. No database credentials or signing secrets are included in the image.
 
 ## Source layout
+
+<details>
+<summary><strong>Find your way around the code</strong></summary>
 
 ```text
 client/src/
@@ -235,6 +316,10 @@ tests/
   api.test.mjs               MongoDB and Express integration tests
 ```
 
+</details>
+
 ## Scope
 
-This release reviews images and screenshots. Email delivery, email ownership verification, password recovery, PDF markup, and video review are outside this version. The class repository’s complete end-term guidelines have not been supplied, so submission-specific requirements still need to be checked against that document.
+This release reviews images and screenshots. Email delivery, email ownership verification, password recovery, PDF markup, and video review are outside this version.
+
+[Back to the top](#reviewroom)
