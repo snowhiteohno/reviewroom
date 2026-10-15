@@ -32,6 +32,7 @@ import {
   Menu,
   Pencil,
   RotateCcw,
+  LockKeyhole,
 } from "lucide-react";
 import type { User, Detail, Status } from "@/lib/types";
 import { statusLabels } from "@/lib/types";
@@ -43,6 +44,7 @@ import {
   date,
   relative,
 } from "@/components/studio-ui";
+import {FeedbackFlow,FixesPanel} from "@/components/FeedbackFlow";
 type Props = {
   detail: Detail;
   user: User;
@@ -81,6 +83,8 @@ export default function Review({
     [uploading, setUploading] = useState(false),
     [menu, setMenu] = useState(false),
     [versionPanel, setVersionPanel] = useState(true);
+  const [kind,setKind]=useState<"suggestion"|"must_fix">("suggestion");
+  const blockers=d.blockers||[];
   const input = useRef<HTMLInputElement>(null),
     commentInput = useRef<HTMLTextAreaElement>(null);
   const current = d.versions.find((v) => v.id === versionId) || d.versions[0];
@@ -112,7 +116,7 @@ export default function Review({
     if (
       await mutate(
         d.project.id,
-        { op: "comment", versionId: current.id, body, ...(pin || {}) },
+        { op: "comment", versionId: current.id, body, kind, ...(pin || {}) },
         "Feedback added.",
       )
     ) {
@@ -161,7 +165,7 @@ export default function Review({
     if (current)
       mutate(
         d.project.id,
-        { op: "status", versionId: current.id, status },
+        { op: "status", versionId: current.id, status, expectedStatus:current.status },
         {
           draft: "Returned to draft.",
           in_review: "Ready for feedback.",
@@ -547,6 +551,7 @@ export default function Review({
             >
               Feedback <span>{roots.length}</span>
             </button>
+            <button className={tab==="fixes"?"active":""} onClick={()=>setTab("fixes")}>Fixes <span>{blockers.length}</span></button>
             <button
               className={tab === "activity" ? "active" : ""}
               onClick={() => setTab("activity")}
@@ -597,7 +602,7 @@ export default function Review({
                             {roots.indexOf(c) + 1}
                           </span>
                         )}
-                        {(canEdit || c.author_id === user.userId) && (
+                        {c.kind!=="must_fix"&&(canEdit || c.author_id === user.userId) && (
                           <button
                             className={
                               "resolve-btn " + (c.resolved ? "done" : "")
@@ -633,6 +638,7 @@ export default function Review({
                         )}
                       </div>
                       <p>{c.body}</p>
+                      <FeedbackFlow comment={c} detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>
                       {comments
                         .filter((r) => r.parent_id === c.id)
                         .map((r) => (
@@ -710,6 +716,7 @@ export default function Review({
                 )}
               </div>
               <form className="comment-composer" onSubmit={addComment}>
+                <label className="feedback-type-label">Feedback type<select aria-label="Feedback type" value={kind} onChange={e=>setKind(e.target.value as "suggestion"|"must_fix")}><option value="suggestion">Suggestion</option><option value="must_fix">Must fix</option></select></label>
                 {pin && (
                   <div className="pin-composer-label">
                     <MapPin size={13} /> Pinned to the design
@@ -751,7 +758,7 @@ export default function Review({
                 </div>
               </form>
             </>
-          ) : (
+          ) : tab==="fixes"?<FixesPanel detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: (
             <div className="review-activity">
               <ActivityList items={d.activity} />
             </div>
@@ -787,6 +794,7 @@ export default function Review({
                         ? "Upload a revision or request another review."
                         : "Request a review when your design is ready."}
               </p>
+              {isLatest&&blockers.length>0&&current.status!=="approved"&&<div className="approval-blockers"><LockKeyhole size={13}/><span>{blockers.length} must fix {blockers.length===1?"item needs":"items need"} verification.</span><button onClick={()=>setTab("fixes")}>Review fixes</button></div>}
               {isLatest && (
                 <>
                   {current.status === "in_review" && d.role !== "editor" ? (
@@ -800,7 +808,7 @@ export default function Review({
                       </button>
                       <button
                         className="button sage-button"
-                        disabled={busy}
+                        disabled={busy||blockers.length>0}
                         onClick={() => statusChange("approved")}
                       >
                         <Check size={15} /> Approve

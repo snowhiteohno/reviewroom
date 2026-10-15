@@ -25,6 +25,8 @@ export type Version = {
   file_key: string;
   file_name: string;
   mime: string;
+  width: number;
+  height: number;
   status: Status;
   created_at: number;
 };
@@ -38,6 +40,11 @@ export type Comment = {
   y: number | null;
   parent_id: string | null;
   resolved: number;
+  kind: "suggestion" | "must_fix";
+  resolution: "open" | "addressed" | "verified";
+  addressed_version_id: string | null;
+  addressed_by: string | null;
+  verified_by: string | null;
   created_at: number;
 };
 export type Member = { id: string; email: string; role: "editor" | "reviewer" };
@@ -55,6 +62,8 @@ export type Detail = {
   comments: Comment[];
   members: Member[];
   activity: Activity[];
+  blockers: Comment[];
+  polls: Poll[];
   role: "owner" | "editor" | "reviewer";
 };
 export const statusLabels: Record<Status, string> = {
@@ -63,3 +72,5 @@ export const statusLabels: Record<Status, string> = {
   changes_requested: "Changes requested",
   approved: "Approved",
 };
+
+export type Poll={id:string;question:string;version_ids:string[];creator_id:string;closed:boolean;my_vote:string|null;counts:Record<string,number>|null;total:number|null;created_at:number};
