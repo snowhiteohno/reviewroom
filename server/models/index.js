@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import {randomUUID} from "node:crypto";
 const {Schema}=mongoose;
-const id={type:String,default:randomUUID};
+const id={type:String,default:()=>randomUUID()};
 const options={timestamps:true,versionKey:false};
 const reference=(ref,required=true)=>({type:String,ref,required});
 const userSchema=new Schema({_id:id,displayName:{type:String,required:true,trim:true,maxLength:60},email:{type:String,required:true,trim:true,lowercase:true,unique:true},passwordHash:{type:String,required:true,select:false},studioInitialized:{type:Boolean,default:false}},options);

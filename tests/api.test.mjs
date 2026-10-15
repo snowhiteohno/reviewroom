@@ -1,327 +1,124 @@
-import { test } from "node:test";
+import {test,before,after} from "node:test";
 import assert from "node:assert/strict";
-const base = process.env.TEST_BASE_URL || "http://127.0.0.1:5175";
-if (!["localhost", "127.0.0.1"].includes(new URL(base).hostname))
-  throw new Error("API tests require a local built preview.");
-const suffix = crypto.randomUUID(),
-  owner = {
-    id: "qa-owner-" + suffix,
-    email: "owner-" + suffix + "@reviewroom.test",
-    name: "QA Owner",
-  },
-  reviewer = {
-    id: "qa-reviewer-" + suffix,
-    email: "reviewer-" + suffix + "@reviewroom.test",
-    name: "QA Reviewer",
-  },
-  editor = {
-    id: "qa-editor-" + suffix,
-    email: "editor-" + suffix + "@reviewroom.test",
-    name: "QA Editor",
-  },
-  stranger = {
-    id: "qa-stranger-" + suffix,
-    email: "stranger-" + suffix + "@reviewroom.test",
-    name: "QA Stranger",
-  };
-async function call(path, actor, body, expected = 200, extra = {}) {
-  const headers = actor
-    ? {
-        "oai-authenticated-user-id": actor.id,
-        "oai-authenticated-user-email": actor.email,
-        "oai-authenticated-user-full-name": encodeURIComponent(actor.name),
-        "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
-      }
-    : {};
-  const res = await fetch(base + path, {
-    method: body ? "POST" : "GET",
-    headers: {
-      ...headers,
-      ...(body instanceof FormData
-        ? {}
-        : { "Content-Type": "application/json" }),
-      ...extra,
-    },
-    body:
-      body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
-    redirect: "manual",
-  });
-  const text = await res.text();
-  assert.equal(res.status, expected, path + ": " + text);
-  return {
-    res,
-    data:
-      text && res.headers.get("content-type")?.includes("json")
-        ? JSON.parse(text)
-        : text,
-  };
-}
-const png = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4GQAAAAASUVORK5CYII=",
-  "base64",
-);
-function file() {
-  const f = new FormData();
-  f.set("file", new File([png], "design.png", { type: "image/png" }));
-  return f;
-}
-test("complete review flow, version isolation, access roles, and private files", async (t) => {
-  await call("/api/studio", null, null, 401);
-  const { data: created } = await call(
-    "/api/studio",
-    owner,
-    {
-      op: "create",
-      name: "QA review flow",
-      description: "Integration test project",
-      category: "Branding",
-      color: "rose",
-    },
-    201,
-  );
-  const path = "/api/projects/" + created.id;
-  await t.test("origin validation and project isolation", async () => {
-    await call(path, stranger, null, 403);
-    const { data: list } = await call("/api/studio", stranger);
-    assert.ok(!list.projects.some((p) => p.id === created.id));
-    await call(
-      path,
-      owner,
-      { op: "rename", name: "Blocked", description: "" },
-      403,
-      { origin: "https://untrusted.invalid" },
-    );
-  });
-  let version;
-  await t.test(
-    "real file storage and concurrent version numbering",
-    async () => {
-      const results = await Promise.all([
-        call(path + "/upload", owner, file(), 201),
-        call(path + "/upload", owner, file(), 201),
-        call(path + "/upload", owner, file(), 201),
-      ]);
-      assert.equal(new Set(results.map((r) => r.data.id)).size, 3);
-      const { data: d } = await call(path, owner);
-      assert.deepEqual(
-        d.versions.map((v) => v.number),
-        [3, 2, 1],
-      );
-      version = d.versions[0].id;
-      await call("/api/assets/" + version, null, null, 401);
-      await call("/api/assets/" + version, stranger, null, 403);
-      const { res } = await call("/api/assets/" + version, owner);
-      assert.equal(res.headers.get("content-type"), "image/png");
-      assert.equal(res.headers.get("cache-control"), "private, no-store");
-      const invalid = new FormData();
-      invalid.set(
-        "file",
-        new File(["<svg></svg>"], "fake.png", { type: "image/png" }),
-      );
-      await call(path + "/upload", owner, invalid, 400);
-    },
-  );
-  await t.test("shared access and role restrictions", async () => {
-    await call(path, owner, {
-      op: "member",
-      email: reviewer.email.toUpperCase(),
-      role: "reviewer",
-    });
-    await call(path, owner, {
-      op: "member",
-      email: editor.email,
-      role: "editor",
-    });
-    const { data: shared } = await call("/api/studio", reviewer);
-    assert.ok(shared.projects.some((p) => p.id === created.id));
-    assert.equal((await call(path, reviewer)).data.role, "reviewer");
-    await call(path + "/upload", reviewer, file(), 403);
-    await call(
-      path,
-      reviewer,
-      { op: "rename", name: "No", description: "" },
-      403,
-    );
-    await call(
-      path,
-      editor,
-      { op: "member", email: stranger.email, role: "editor" },
-      403,
-    );
-    await call(path, editor, { op: "archive", value: true }, 403);
-  });
-  let rootId;
-  await t.test(
-    "pinned feedback, replies, resolution, and version isolation",
-    async () => {
-      await call(
-        path,
-        reviewer,
-        {
-          op: "comment",
-          versionId: version,
-          body: "Invalid coordinates",
-          x: 2,
-          y: 0.3,
-        },
-        400,
-      );
-      await call(path, owner, {
-        op: "comment",
-        versionId: version,
-        body: "Make the title larger",
-        x: 0.33,
-        y: 0.62,
-      });
-      const { data: d } = await call(path, owner);
-      const root = d.comments.find((c) => !c.parent_id);
-      rootId = root.id;
-      assert.equal(root.x, 0.33);
-      assert.equal(root.y, 0.62);
-      await call(path, reviewer, {
-        op: "comment",
-        versionId: version,
-        body: "Agreed",
-        parentId: rootId,
-      });
-      await call(
-        path,
-        reviewer,
-        { op: "resolve", versionId: version, commentId: rootId, value: true },
-        403,
-      );
-      await call(path, editor, {
-        op: "resolve",
-        versionId: version,
-        commentId: rootId,
-        value: true,
-      });
-      const { data: resolved } = await call(path, owner);
-      assert.equal(resolved.comments.find((c) => c.id === rootId).resolved, 1);
-      assert.equal(
-        resolved.comments.filter((c) => c.parent_id === rootId).length,
-        1,
-      );
-      await call(
-        path,
-        owner,
-        {
-          op: "comment",
-          versionId: resolved.versions[1].id,
-          body: "Wrong parent",
-          parentId: rootId,
-        },
-        400,
-      );
-    },
-  );
-  await t.test("review transitions and decisions", async () => {
-    await call(
-      path,
-      reviewer,
-      { op: "status", versionId: version, status: "approved" },
-      409,
-    );
-    await call(
-      path,
-      reviewer,
-      { op: "status", versionId: version, status: "in_review" },
-      403,
-    );
-    await call(path, editor, {
-      op: "status",
-      versionId: version,
-      status: "in_review",
-    });
-    await call(
-      path,
-      editor,
-      { op: "status", versionId: version, status: "approved" },
-      403,
-    );
-    await call(path, reviewer, {
-      op: "status",
-      versionId: version,
-      status: "changes_requested",
-    });
-    await call(path, editor, {
-      op: "status",
-      versionId: version,
-      status: "in_review",
-    });
-    await call(path, reviewer, {
-      op: "status",
-      versionId: version,
-      status: "approved",
-    });
-    const { data: d } = await call(path, owner);
-    assert.equal(d.versions[0].status, "approved");
-    assert.equal(d.versions[1].status, "draft");
-    await call(
-      path,
-      reviewer,
-      { op: "status", versionId: version, status: "changes_requested" },
-      409,
-    );
-    await call(
-      path,
-      owner,
-      { op: "status", versionId: d.versions[1].id, status: "in_review" },
-      409,
-    );
-  });
-  await t.test(
-    "concurrent review decisions produce one decision and one activity record",
-    async () => {
-      await call(path, owner, {
-        op: "status",
-        versionId: version,
-        status: "draft",
-      });
-      await call(path, owner, {
-        op: "status",
-        versionId: version,
-        status: "in_review",
-      });
-      const before = (await call(path, owner)).data.activity.length;
-      const decide = async (status) => {
-        const res = await fetch(base + path, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "oai-authenticated-user-id": reviewer.id,
-            "oai-authenticated-user-email": reviewer.email,
-          },
-          body: JSON.stringify({ op: "status", versionId: version, status }),
-        });
-        return res.status;
-      };
-      const outcomes = await Promise.all([
-        decide("approved"),
-        decide("changes_requested"),
-      ]);
-      assert.deepEqual(outcomes.sort(), [200, 409]);
-      const after = (await call(path, owner)).data;
-      assert.equal(after.activity.length, before + 1);
-      assert.ok(
-        ["approved", "changes_requested"].includes(after.versions[0].status),
-      );
-    },
-  );
-  await t.test(
-    "personal favorites, membership removal, archive and restore",
-    async () => {
-      await call(path, reviewer, { op: "star", value: true });
-      assert.equal((await call(path, reviewer)).data.project.starred, 1);
-      assert.equal((await call(path, owner)).data.project.starred, 0);
-      await call(path, owner, { op: "remove-member", email: reviewer.email });
-      await call(path, reviewer, null, 403);
-      await call("/api/assets/" + version, reviewer, null, 403);
-      await call(path, owner, { op: "archive", value: true });
-      assert.equal((await call(path, owner)).data.project.archived, 1);
-      await call(path, owner, { op: "archive", value: false });
-      assert.equal((await call(path, owner)).data.project.archived, 0);
-      await call(path, owner, { op: "archive", value: true });
-    },
-  );
+import supertest from "supertest";
+import mongoose from "mongoose";
+import {randomUUID} from "node:crypto";
+import {mkdtemp,mkdir,rm} from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+import {createApp} from "../server/app.js";
+import {connectDatabase} from "../server/config/database.js";
+import {User,Project,Version,Comment,Vote} from "../server/models/index.js";
+import {startLocalMongo} from "../scripts/mongo.mjs";
+const suffix=randomUUID().replaceAll("-",""),dbName="reviewroom_test_"+suffix;
+const uri=process.env.TEST_MONGODB_URI||"mongodb://127.0.0.1:27019/"+dbName+"?replicaSet=reviewroom-dev";
+let app,uploads,mongo,owner,editor,reviewer,stranger,id,v1,v2,blocker,poll;
+const password="A thoughtful test password "+suffix;
+const actor=label=>({displayName:label,email:label.toLowerCase()+"-"+suffix+"@reviewroom.test",password});
+async function register(data){const agent=supertest.agent(app);const res=await agent.post("/api/auth/register").send(data).expect(201);return {agent,user:res.body.user,data,cookie:res.headers["set-cookie"][0]}}
+before(async()=>{if(!process.env.TEST_MONGODB_URI)mongo=await startLocalMongo();await connectDatabase(uri);assert.match(mongoose.connection.name,/^reviewroom_test_[a-z0-9]+$/);await mkdir(".data/test-uploads",{recursive:true});uploads=await mkdtemp(path.resolve(".data/test-uploads/run-"));app=createApp({secret:"test-only-secret-"+suffix+suffix,production:false,origins:new Set(["http://localhost:5174"]),uploadDir:uploads});owner=await register(actor("Mallika"));editor=await register(actor("Editor"));reviewer=await register(actor("Reviewer"));stranger=await register(actor("Stranger"));});
+after(async()=>{if(mongoose.connection.readyState===1){assert.match(mongoose.connection.name,/^reviewroom_test_[a-z0-9]+$/);await mongoose.connection.dropDatabase();await mongoose.disconnect()}if(uploads)await rm(uploads,{recursive:true,force:true});mongo?.kill("SIGTERM")});
+test("authentication uses hashed passwords, private cookies, and revocable sessions",async()=>{
+ assert.match(owner.cookie,/HttpOnly/i);assert.match(owner.cookie,/SameSite=Lax/i);
+ const stored=await User.findById(owner.user.userId).select("+passwordHash");assert.notEqual(stored.passwordHash,password);assert.match(stored.passwordHash,/^\$2[aby]\$/);
+ assert.equal("passwordHash" in owner.user,false);
+ await supertest(app).get("/api/auth/me").expect(401);
+ await supertest(app).get("/api/studio").set("oai-authenticated-user-id",owner.user.userId).set("oai-authenticated-user-email",owner.user.email).expect(401);
+ await supertest(app).post("/api/auth/login").send({email:owner.data.email,password:"wrong"}).expect(401);
+ await supertest(app).post("/api/auth/register").send({...owner.data,email:"bad"}).expect(400);
+ await supertest(app).post("/api/auth/register").send({...owner.data,password:"short"}).expect(400);
+ const login=supertest.agent(app);const signed=await login.post("/api/auth/login").send({email:owner.data.email.toUpperCase(),password}).expect(200);
+ const cookie=signed.headers["set-cookie"][0].split(";")[0];await login.post("/api/auth/logout").send({}).expect(200);await supertest(app).get("/api/auth/me").set("Cookie",cookie).expect(401);
+ await owner.agent.get("/api/auth/me").expect(200);
+});
+test("project permissions, input validation, and membership are checked on the server",async()=>{
+ const created=await owner.agent.post("/api/projects").send({name:"A new identity",category:"Branding",color:"rose"}).expect(201);id=created.body.id;
+ await owner.agent.patch("/api/projects/"+id).set("Origin","https://untrusted.invalid").send({name:"No"}).expect(403);
+ await owner.agent.post("/api/projects").set("Content-Type","application/json").send("null").expect(400);
+ await stranger.agent.get("/api/projects/"+id).expect(403);
+ assert.equal((await stranger.agent.get("/api/studio")).body.projects.length,0);
+ await owner.agent.post("/api/projects/"+id+"/members").send({email:reviewer.data.email.toUpperCase(),role:"reviewer"}).expect(200);
+ await owner.agent.post("/api/projects/"+id+"/members").send({email:editor.data.email,role:"editor"}).expect(200);
+ await editor.agent.post("/api/projects/"+id+"/members").send({email:stranger.data.email,role:"editor"}).expect(403);
+ await reviewer.agent.patch("/api/projects/"+id).send({name:"No"}).expect(403);
+ await editor.agent.patch("/api/projects/"+id).send({op:"archive",value:true}).expect(403);
+ assert.equal((await reviewer.agent.get("/api/studio")).body.projects[0].id,id);
+ await reviewer.agent.put("/api/projects/"+id+"/favorite").send({value:true}).expect(200);
+ assert.equal((await reviewer.agent.get("/api/projects/"+id)).body.project.starred,1);
+ assert.equal((await owner.agent.get("/api/projects/"+id)).body.project.starred,0);
+});
+test("uploads are real images, private, and numbered safely under concurrent requests",async()=>{
+ const png=await sharp({create:{width:240,height:180,channels:3,background:"#d5a7ad"}}).png().toBuffer();
+ const upload=agent=>agent.post("/api/projects/"+id+"/upload").attach("file",png,"design.png");
+ await upload(reviewer.agent).expect(403);
+ await owner.agent.post("/api/projects/"+id+"/upload").attach("file",Buffer.from("<svg></svg>"),"fake.png").expect(400);
+ const result=await upload(owner.agent).expect(201);v1=result.body.id;
+ const concurrent=await Promise.all([upload(editor.agent),upload(editor.agent)]);assert.deepEqual(concurrent.map(r=>r.status),[201,201]);
+ const detail=(await owner.agent.get("/api/projects/"+id)).body;
+ assert.deepEqual(detail.versions.map(v=>v.number),[3,2,1]);v2=detail.versions[0].id;
+ await supertest(app).get("/api/assets/"+v1).expect(401);await stranger.agent.get("/api/assets/"+v1).expect(403);
+ const asset=await reviewer.agent.get("/api/assets/"+v1).expect(200);assert.match(asset.headers["cache-control"],/private/);assert.equal(asset.headers["content-type"],"image/png");
+ assert.equal((await Version.findById(v2)).width,240);
+});
+test("pinned feedback supports replies and keeps conversations on their original version",async()=>{
+ await reviewer.agent.post("/api/projects/"+id+"/comments").send({versionId:v1,body:"Outside",x:2,y:.4}).expect(400);
+ await reviewer.agent.post("/api/projects/"+id+"/comments").send({versionId:v1,body:"Increase the title spacing",x:.3,y:.55,kind:"must_fix"}).expect(201);
+ let detail=(await owner.agent.get("/api/projects/"+id)).body;blocker=detail.comments.find(c=>c.kind==="must_fix").id;
+ await editor.agent.post("/api/projects/"+id+"/comments").send({versionId:v1,parentId:blocker,body:"I will revise this."}).expect(201);
+ await editor.agent.post("/api/projects/"+id+"/comments").send({versionId:v2,parentId:blocker,body:"Wrong version"}).expect(400);
+ detail=(await owner.agent.get("/api/projects/"+id)).body;assert.equal(detail.comments.filter(c=>c.version_id===v2).length,0);assert.equal(detail.comments.find(c=>c.id===blocker).x,.3);
+ await owner.agent.patch("/api/projects/"+id+"/comments/"+blocker).send({action:"resolve"}).expect(409);
+});
+test("must fix feedback needs a later revision, an independent reviewer, and verification before approval",async()=>{
+ const comments="/api/projects/"+id+"/comments/"+blocker,review="/api/projects/"+id+"/review";
+ await reviewer.agent.post(review).send({versionId:v2,status:"in_review"}).expect(403);
+ await editor.agent.post(review).send({versionId:v2,status:"in_review"}).expect(200);
+ await reviewer.agent.post(review).send({versionId:v2,status:"approved"}).expect(409);
+ await reviewer.agent.patch(comments).send({action:"verify"}).expect(409);
+ await reviewer.agent.patch(comments).send({action:"address",versionId:v2}).expect(403);
+ await editor.agent.patch(comments).send({action:"address",versionId:v1}).expect(400);
+ await editor.agent.patch(comments).send({action:"address",versionId:v2}).expect(200);
+ await editor.agent.patch(comments).send({action:"verify"}).expect(403);
+ await reviewer.agent.patch(comments).send({action:"verify"}).expect(200);
+ const fixed=(await owner.agent.get("/api/projects/"+id)).body;assert.equal(fixed.blockers.length,0);assert.equal(fixed.comments.find(c=>c.id===blocker).addressed_version_id,v2);
+ await editor.agent.post(review).send({versionId:v2,status:"approved"}).expect(403);
+ await reviewer.agent.post(review).send({versionId:v2,status:"approved"}).expect(200);
+ await owner.agent.patch(comments).send({action:"reopen"}).expect(409);
+ await reviewer.agent.post("/api/projects/"+id+"/comments").send({versionId:v1,kind:"must_fix",body:"New blocker"}).expect(409);
+ await owner.agent.post(review).send({versionId:v1,status:"in_review"}).expect(409);
+});
+test("concurrent review decisions record one winner and preserve the activity trail",async()=>{
+ const url="/api/projects/"+id+"/review";await owner.agent.post(url).send({versionId:v2,status:"draft"}).expect(200);await owner.agent.post(url).send({versionId:v2,status:"in_review"}).expect(200);
+ const before=(await owner.agent.get("/api/projects/"+id)).body.activity.length;
+ const results=await Promise.all([reviewer.agent.post(url).send({versionId:v2,status:"approved",expectedStatus:"in_review"}),owner.agent.post(url).send({versionId:v2,status:"changes_requested",expectedStatus:"in_review"})]);assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+ const detail=(await owner.agent.get("/api/projects/"+id)).body;assert.equal(detail.activity.length,before+1);
+});
+test("blind voting hides counts, enforces one vote, and reveals closed results to nonvoters",async()=>{
+ const base="/api/projects/"+id;
+ const created=await owner.agent.post(base+"/polls").send({question:"Which direction feels right?",versionIds:[v1,v2]}).expect(201);poll=created.body.id;
+ let p=(await reviewer.agent.get(base)).body.polls[0];assert.equal(p.counts,null);assert.equal(p.total,null);assert.equal(p.my_vote,null);
+ await reviewer.agent.post(base+"/polls").send({question:"No",versionIds:[v1,v2]}).expect(403);
+ await stranger.agent.post(base+"/polls/"+poll+"/votes").send({versionId:v1}).expect(403);
+ const votes=await Promise.all([reviewer.agent.post(base+"/polls/"+poll+"/votes").send({versionId:v1}),reviewer.agent.post(base+"/polls/"+poll+"/votes").send({versionId:v2})]);assert.deepEqual(votes.map(r=>r.status).sort(),[201,409]);assert.equal(await Vote.countDocuments({pollId:poll}),1);
+ p=(await reviewer.agent.get(base)).body.polls[0];assert.equal(p.total,1);assert.ok(p.counts);assert.equal((await editor.agent.get(base)).body.polls[0].counts,null,"Editors cannot bypass blind results");
+ await reviewer.agent.patch(base+"/polls/"+poll+"/close").send({}).expect(403);
+ await owner.agent.patch(base+"/polls/"+poll+"/close").send({}).expect(200);
+ p=(await editor.agent.get(base)).body.polls[0];assert.ok(p.counts);assert.equal(p.total,1);assert.equal(p.my_vote,null);
+ await editor.agent.post(base+"/polls/"+poll+"/votes").send({versionId:v1}).expect(409);
+});
+test("a vote cannot include designs from another project",async()=>{
+ const other=(await owner.agent.post("/api/projects").send({name:"Other project"})).body.id;
+ const png=await sharp({create:{width:10,height:10,channels:3,background:"#ddd"}}).png().toBuffer();
+ const otherVersion=(await owner.agent.post("/api/projects/"+other+"/upload").attach("file",png,"other.png")).body.id;
+ await owner.agent.post("/api/projects/"+id+"/polls").send({question:"Invalid options",versionIds:[v1,otherVersion]}).expect(400);
+});
+test("membership removal immediately removes project and file access",async()=>{
+ await owner.agent.delete("/api/projects/"+id+"/members").send({email:reviewer.data.email}).expect(200);
+ await reviewer.agent.get("/api/projects/"+id).expect(403);await reviewer.agent.get("/api/assets/"+v1).expect(403);
+ await owner.agent.patch("/api/projects/"+id).send({op:"archive",value:true}).expect(200);assert.equal((await owner.agent.get("/api/projects/"+id)).body.project.archived,1);
+ await owner.agent.patch("/api/projects/"+id).send({op:"archive",value:false}).expect(200);
+});
+test("sample studios initialize once even when requests arrive together",async()=>{
+ await Promise.all([stranger.agent.post("/api/studio").send({}),stranger.agent.post("/api/studio").send({})]);
+ const detail=(await stranger.agent.get("/api/studio")).body;assert.equal(detail.projects.length,6);assert.ok(detail.projects.every(p=>p.sample===1));assert.equal(await Project.countDocuments({ownerId:stranger.user.userId}),6);
 });
