@@ -1,135 +1,240 @@
 # ReviewRoom
 
-A collaborative design review studio with a soft, paper-inspired interface. Upload a design, leave feedback at a specific point, add revisions, and approve the final version.
+A design review studio built with **MongoDB, Express, React, and Node.js**.
 
-Source owner: [Mallika](https://github.com/snowhiteohno). The project is kept on the personal GitHub account and runs locally. It is not published through the connected Sites account.
+Upload a design, collect feedback at specific points, link a revision to each fix, and get the final version approved. The interface uses cream, dusty rose, sage, and paper-inspired details.
 
-## What works
+Built for [Mallika’s personal account](https://github.com/snowhiteohno). The repository is public. The application runs locally and has not been published through another hosting account.
 
-- Project creation, descriptions, categories, personal favorites, search, filters, grid and list views, and archiving.
-- Private image uploads to Cloudflare R2. PNG, JPEG, WebP, and GIF files are accepted up to 12 MB. Uploads are checked by file signature.
-- Sequential version numbers assigned atomically in the database, including simultaneous uploads.
-- Pinned comments stored as normalized coordinates. Annotations remain aligned when the canvas resizes or zooms.
-- Threaded replies, resolved discussions, and separate feedback for each version.
-- Side by side version comparison.
-- Review requests, change requests, approval, and reopening an approved version.
-- Owner, editor, and reviewer permissions enforced on the server.
-- Sharing by email address and a copied project link.
-- Durable project activity and a studio activity feed.
-- Responsive layouts, keyboard focus states, native accessible dialogs, reduced motion support, and loading, empty, and error states.
+## Three features to try
 
-The six starter projects are clearly labeled samples. Their artwork is original SVG illustration included in this repository. Sample comments are marked as samples. A starter studio is created once for each signed-in user.
+### Feedback to fix
+
+Feedback can be a suggestion or a must fix. A designer links a later revision to show how they addressed it. Another reviewer verifies that revision.
+
+Must fix items stay visible across versions. Approval is blocked until every must fix in the project is verified. The server enforces this rule inside a MongoDB transaction.
+
+### Blind design voting
+
+Choose two or three uploaded versions and ask the team to pick a direction. Each account gets one vote. Counts stay hidden until that person votes or the poll closes, including for owners and editors.
+
+The results use a MongoDB aggregation pipeline. A compound unique index prevents duplicate votes, and membership checks protect the results.
+
+### Before and after reveal
+
+Select two revisions and drag a divider to reveal what changed. The slider supports touch, mouse, and keyboard controls. Images with different proportions are fitted to a shared frame without being stretched.
+
+## Other working features
+
+- Registration, login, logout, and persistent sessions.
+- bcrypt password hashes and JWT authentication in HttpOnly cookies.
+- Protected routes, project membership, and owner, editor, and reviewer permissions.
+- Private image uploads with size, format, and dimension validation.
+- Version history with safe numbering during concurrent uploads.
+- Pinned comments, threaded replies, and resolved discussions.
+- Side by side comparison, canvas zoom, and responsive pin coordinates.
+- Project categories, search, filters, favorites, grid and list views, and archiving.
+- Project activity, studio activity, and automatic refreshes while the page is visible.
+- Loading, error, and empty states, native dialogs, and reduced motion support.
+
+The starter projects and sample comments are labeled as samples. Their artwork is original SVG illustration included in this repository. Sample studios are created once per account, including when initialization requests arrive together.
 
 ## Stack
 
-| Layer          | Technology                                           |
-| -------------- | ---------------------------------------------------- |
-| Interface      | React 19, TypeScript, CSS, Lucide icons              |
-| Application    | Vinext using the Next.js App Router conventions      |
-| Runtime        | Cloudflare Workers                                   |
-| Database       | Cloudflare D1, SQLite, Drizzle schema and migrations |
-| File storage   | Cloudflare R2                                        |
-| Authentication | Sites-managed ChatGPT sign-in                        |
-| Testing        | Node test runner and Playwright against Chrome       |
+| Layer          | Technology                                              |
+| -------------- | ------------------------------------------------------- |
+| Client         | React 19, TypeScript, Vite, React Router                |
+| Styling        | CSS, system fonts, Lucide icons                         |
+| Server         | Node.js, Express 5, MVC folders                         |
+| Database       | MongoDB with Mongoose                                   |
+| Authentication | bcrypt, jsonwebtoken, cookie-parser, revocable sessions |
+| Uploads        | Multer, Sharp, private filesystem storage               |
+| Validation     | Zod, Mongoose schemas, database indexes                 |
+| Testing        | Node test runner, Supertest, Playwright                 |
 
-There are no paid API dependencies and no AI API key is needed.
+No AI API key or paid API is needed.
 
 ## Run locally
 
-Requires Node.js 22.13 or newer and npm.
+Requires Node.js 22.13 or newer and npm. Choose either a local MongoDB Community installation with mongod on your PATH, or a MongoDB Atlas connection.
 
 ```sh
 npm ci
-npm run build
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_safe_kinsey_walden.sql
-npm run dev -- --port 5174
+npm run dev
 ```
 
-Apply each migration once to a fresh local database. Local files and records persist under the ignored .wrangler/state directory.
+Open **http://localhost:5174**, create an account, and start exploring. There are no hardcoded accounts or shared passwords.
 
-Open http://127.0.0.1:5174. The portable development server provides a local sign-in account called Mallika. The app redirects through its local sign-in route automatically. Hosted sign-in uses the actual visitor identity.
+With no MONGODB_URI set, the development script starts a dedicated local MongoDB replica set on port 27019. It stores database files under the ignored .data/mongo directory. It does not change another MongoDB service. A matching ReviewRoom instance already on that port is reused.
 
-For later starts, use npm run dev. Rebuild after changing bindings. After a schema change, run npm run db:generate, inspect the generated SQL, build, and apply only new migrations.
+The development script starts the Express API on port 5180 and the React client on port 5174. Vite proxies API requests so cookies stay on the same origin.
 
-## A short demo
+### Use MongoDB Atlas instead
 
-1. Create a project and upload a design image.
-2. Select Add pin, click the design, and post a comment.
-3. Reply to the conversation, resolve it, and reopen it.
-4. Upload a second image. It appears as a new version with its own feedback.
-5. Select Compare to inspect both images together.
-6. Request a review. A reviewer or owner can request changes or approve.
-7. Open Share, add a teammate as an editor or reviewer, and copy the link.
-8. Reload to confirm that versions, comments, access, and review state persist.
+Copy .env.example to .env and fill in MONGODB_URI with your own Atlas connection string. Then run npm run dev. Local MongoDB startup is skipped when a URI is provided.
 
-## Permissions
+Use a replica set or Atlas. ReviewRoom uses transactions to keep feedback, approvals, membership changes, votes, and version numbers consistent.
 
-| Action                         | Owner | Editor | Reviewer     |
-| ------------------------------ | ----- | ------ | ------------ |
-| View files and feedback        | Yes   | Yes    | Yes          |
-| Comment and reply              | Yes   | Yes    | Yes          |
-| Resolve any conversation       | Yes   | Yes    | Own comments |
-| Upload revisions               | Yes   | Yes    | No           |
-| Edit project details           | Yes   | Yes    | No           |
-| Request review or reopen draft | Yes   | Yes    | No           |
-| Approve or request changes     | Yes   | No     | Yes          |
-| Manage access or archive       | Yes   | No     | No           |
-| Personal favorite              | Yes   | Yes    | Yes          |
+### Local data
 
-Only the latest version can change review state. A review decision requires the version to be in review. Review updates use a compare-and-set operation so concurrent decisions cannot silently overwrite one another.
+- .data/mongo: local MongoDB data.
+- .data/uploads: private uploaded images.
+- .data/session-secret: a generated development-only signing secret.
+- .data/mongod.log: local MongoDB logs.
 
-Adding a collaborator records access; it does not send email. Share the copied link yourself. Sites publications start owner-private, so a teammate also needs permission to visit the hosted Site. Application-level membership does not override the hosting audience.
+These paths, .env files, test artifacts, and browser screenshots are ignored by Git. Local data survives application restarts.
 
-## Architecture
+## A demo you can present
 
-The browser renders the studio and review canvas. All project operations go through server routes. Each request obtains the signed-in identity and checks ownership or email membership before returning records or reading R2.
+1. Register a designer account and a reviewer account in separate browser profiles.
+2. Create a project and upload a design.
+3. Add the reviewer’s email through Share, then send them the copied link.
+4. As the reviewer, pin a Must fix comment on the design.
+5. As the designer, upload a revision and open Fixes.
+6. Select Link a fix and choose the later revision.
+7. Request a review. Approval stays disabled until verification.
+8. As the reviewer, verify the linked revision and approve it.
+9. Open Compare and switch to Reveal changes.
+10. Open Votes, start a blind vote, and show how results appear after voting.
 
-D1 stores projects, versions, comments, members, personal favorites, profiles, and activity. R2 stores uploaded bytes under generated keys. Files are served through an authenticated route with private cache headers; knowing a version ID does not grant access.
+A sample Flora project includes two revisions, an addressed sample fix, and a blind vote so you can explore these features immediately.
 
-A revision upload writes its file first, then inserts the version and activity in a database batch. A failed database operation removes the uploaded object. Version numbers are allocated inside a single INSERT SELECT statement and protected by a unique index.
+## Roles
 
-Pinned coordinates are proportions from zero to one relative to the displayed image. Replies belong to a root comment on the same version. Version history preserves each previous review decision.
+| Action                          | Owner | Editor                   | Reviewer |
+| ------------------------------- | ----- | ------------------------ | -------- |
+| View designs and feedback       | Yes   | Yes                      | Yes      |
+| Comment and reply               | Yes   | Yes                      | Yes      |
+| Upload revisions and link fixes | Yes   | Yes                      | No       |
+| Request review or reopen draft  | Yes   | Yes                      | No       |
+| Approve or request changes      | Yes   | No                       | Yes      |
+| Verify another person’s fix     | Yes   | Original feedback author | Yes      |
+| Manage access or archive        | Yes   | No                       | No       |
+| Start a blind vote              | Yes   | Yes                      | No       |
+| Vote once in a poll             | Yes   | Yes                      | Yes      |
+| Close a poll                    | Yes   | Poll creator             | No       |
 
-The activity feed refreshes every 20 seconds while the page is visible. Mutations refresh the current project immediately.
+A person cannot verify their own fix. Ordinary suggestions can be resolved directly by an editor, owner, or their author. Must fix items require the linked-revision verification flow.
 
-Authentication headers are supplied by the trusted Sites edge. The built Worker is intended to run behind that edge. The local built preview accepts test identity headers for integration testing and binds to loopback.
+Sharing records access; it does not send email. The teammate registers or signs in with the email added to the project. Removing membership immediately removes access to files and project operations.
 
-## Verification
+## How it works
+
+```mermaid
+flowchart LR
+  Browser[React client] --> API[Express routes]
+  API --> Auth[JWT and session middleware]
+  Auth --> Controllers[Controllers and validation]
+  Controllers --> Transactions[Mongoose services and transactions]
+  Transactions --> Mongo[(MongoDB)]
+  Controllers --> Images[Private image storage]
+```
+
+The server loads the signed-in account from a verified JWT and a live session record. Client-supplied identity headers are ignored. Logout deletes that session, so replaying its old cookie no longer works.
+
+Projects have embedded membership records. Versions, comments, polls, votes, favorites, and activity reference their parent records through Mongoose models. Uploaded bytes are outside the public directory and are returned only after checking project access.
+
+Every project mutation first writes the project’s revision inside a transaction. Concurrent writes therefore conflict and retry safely. Approval checks and feedback verification run in that same transaction, preventing a competing blocker from being ignored.
+
+Version numbers use a project counter protected by the transaction and a unique project-number index. Failed database operations remove the newly written image file.
+
+Pinned coordinates are normalized from zero to one relative to the image. They remain aligned while the canvas resizes and zooms.
+
+## Syllabus map
+
+| MERN concept                      | Where ReviewRoom uses it                                                |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| React components and props        | Studio, review canvas, forms, and reusable feedback components          |
+| Controlled forms and validation   | Registration, login, projects, feedback, voting, and sharing            |
+| Hooks, refs, and events           | Pin placement, canvas zoom, comparison slider, and refresh logic        |
+| Context and protected routing     | AuthProvider and React Router login redirects                           |
+| Fetch and REST APIs               | Client requests to Express routes                                       |
+| Node.js and environment variables | Runtime configuration, development tools, and private file storage      |
+| Express MVC and middleware        | Routes, controllers, authentication, origin checks, uploads, and errors |
+| MongoDB and Mongoose              | Models, validation, references, indexes, and queries                    |
+| Aggregation                       | Grouping blind votes into result counts                                 |
+| Authentication and authorization  | bcrypt, JWTs, HttpOnly cookies, sessions, and project roles             |
+| CRUD and business rules           | Projects, members, feedback states, revisions, and approvals            |
+| Transactions and concurrency      | Safe version numbering, approval gates, and duplicate voting protection |
+
+## API overview
+
+| Method       | Endpoint                              | Purpose                                       |
+| ------------ | ------------------------------------- | --------------------------------------------- |
+| POST         | /api/auth/register                    | Create an account                             |
+| POST         | /api/auth/login                       | Start a session                               |
+| GET          | /api/auth/me                          | Read the signed-in account                    |
+| POST         | /api/auth/logout                      | Revoke the current session                    |
+| GET          | /api/studio                           | List accessible projects and activity         |
+| POST         | /api/studio                           | Initialize a sample studio once               |
+| POST         | /api/projects                         | Create a project                              |
+| GET          | /api/projects/:id                     | Read a project, versions, feedback, and polls |
+| PATCH        | /api/projects/:id                     | Edit or archive a project                     |
+| PUT          | /api/projects/:id/favorite            | Change a personal favorite                    |
+| POST, DELETE | /api/projects/:id/members             | Add, update, or remove access                 |
+| POST         | /api/projects/:id/upload              | Upload a revision                             |
+| GET          | /api/assets/:id                       | Read an authorized image                      |
+| POST         | /api/projects/:id/comments            | Add feedback or a reply                       |
+| PATCH        | /api/projects/:id/comments/:commentId | Resolve, reopen, address, or verify feedback  |
+| POST         | /api/projects/:id/review              | Request review or make a review decision      |
+| POST         | /api/projects/:id/polls               | Start a design vote                           |
+| POST         | /api/projects/:id/polls/:pollId/votes | Cast one vote                                 |
+| PATCH        | /api/projects/:id/polls/:pollId/close | Close voting and reveal results               |
+
+## Tests and checks
 
 ```sh
 npm run typecheck
 npm run build
-npm start -- --port 5175
+npm test
 ```
 
-In another terminal:
+The API suite uses Supertest and a real MongoDB replica set. It creates a uniquely named reviewroom_test database, checks its name before cleanup, and drops only that database. It covers password hashing, session revocation, access controls, private files, concurrent uploads, feedback isolation, independent verification, approval races, blind voting, cross-project options, membership removal, and idempotent sample setup.
 
-```sh
-npm run test:api
-```
-
-The API suite runs only against a local built preview. It covers project isolation, unauthorized file access, roles, signature validation, concurrent revision uploads, normalized pins, replies, version isolation, review decisions, favorites, membership removal, and archiving. Its test records are isolated under generated test identities.
-
-For the browser suite, run the development server on port 5174 and a Chrome instance with remote debugging enabled. The suite connects to http://localhost:9222 by default:
+For browser tests, keep npm run dev running and start Chrome with remote debugging enabled:
 
 ```sh
 npm run test:ui
 ```
 
-CHROME_CDP_URL and UI_BASE_URL can override the defaults. The suite creates and archives a test project, exercises the full review flow, checks desktop and mobile layout, verifies pin alignment after resizing, and saves screenshots under the ignored artifacts directory. Browser tests use the connected browser's local sign-in account.
+CHROME_CDP_URL defaults to http://localhost:9222. UI_BASE_URL defaults to http://localhost:5174. The browser suite uses separate temporary browser contexts for a designer and reviewer. It tests registration, login and logout, uploads, sharing, linked fixes, approval blocking, verification, voting, keyboard slider controls, mobile layout, and persistence after signing in again.
+
+Screenshots are saved under artifacts. Test-created browser accounts use generated reviewroom.test email addresses. Their uploaded test project is archived on a successful run.
+
+## Production build
+
+```sh
+npm run build
+NODE_ENV=production npm start
+```
+
+Set MONGODB_URI, APP_ORIGIN, and a random JWT_SECRET of at least 32 characters in the hosting environment. Production authentication cookies require HTTPS. Use persistent storage for UPLOAD_DIR and keep it outside public static files. Express serves the compiled React client and API from the same origin.
+
+The application is currently kept local, as requested. No external hosting account is required for development.
 
 ## Source layout
 
-- app/studio.tsx: project dashboard, navigation, and studio state.
-- app/review.tsx: review canvas, annotation placement, version comparison, and conversations.
-- components/studio-ui.tsx: dialogs, forms, sharing, status badges, and shared UI.
-- app/api: authenticated project, upload, asset, and studio routes.
-- lib/server.ts: database access, identity, authorization, input validation, and error handling.
-- lib/samples.ts: idempotent sample studio setup.
-- db/schema.ts and drizzle: schema and versioned SQL migrations.
-- public/samples: original sample artwork.
-- tests/api.test.mjs and scripts/ui-check.mjs: integration and browser verification.
+```text
+client/src/
+  App.tsx, AuthPage.tsx       Routing and authentication screens
+  Studio.tsx, Review.tsx     Project board and review canvas
+  components/                Forms, feedback flow, design votes, comparison
+  lib/                       Auth context, typed data, API adapter
+server/
+  config/                    Environment and MongoDB setup
+  models/                    Mongoose schemas and indexes
+  controllers/               Authentication and product operations
+  middleware/                JWT sessions and request origin checks
+  routes/                    Express endpoints
+  services/                  Authorization, transactions, samples, vote results
+  utils/                     Validation and error responses
+scripts/
+  dev.mjs, mongo.mjs          Local development and database startup
+  ui-check.mjs               Two-account browser verification
+tests/
+  api.test.mjs               MongoDB and Express integration tests
+```
 
-## Project scope
+## Scope
 
-This release reviews image designs and screenshots. PDF markup, video review, email delivery, and live cursors are outside this version. The class repository's complete guidelines have not been supplied, so final submission-specific requirements still need to be checked against that document.
+This release reviews images and screenshots. Email delivery, email ownership verification, password recovery, PDF markup, and video review are outside this version. The class repository’s complete end-term guidelines have not been supplied, so submission-specific requirements still need to be checked against that document.
