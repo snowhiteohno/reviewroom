@@ -40,14 +40,14 @@ import {
   categories,
 } from "@/components/studio-ui";
 import Review from "./Review";
-import {projectAction} from "./lib/api";
-import {useAuth} from "./lib/auth";
-import {useNavigate,useLocation} from "react-router-dom";
+import { projectAction } from "./lib/api";
+import { useAuth } from "./lib/auth";
+import { useNavigate, useLocation } from "react-router-dom";
 type View = "all" | "shared" | "starred" | "activity" | "archive";
 export default function Studio({ user }: { user: User }) {
- const {logout}=useAuth();
- const navigate=useNavigate(),route=useLocation();
- useEffect(()=>setSelected(new URLSearchParams(route.search).get("project")),[route.search]);
+  const { logout } = useAuth();
+  const navigate = useNavigate(),
+    route = useLocation();
   const [projects, setProjects] = useState<Project[]>([]),
     [activity, setActivity] = useState<Activity[]>([]),
     [loading, setLoading] = useState(true),
@@ -70,6 +70,11 @@ export default function Studio({ user }: { user: User }) {
     [account, setAccount] = useState(false),
     [welcome, setWelcome] = useState(true);
   const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(
+    () => setSelected(new URLSearchParams(route.search).get("project")),
+    [route.search],
+  );
+
   const notify = useCallback(
     (text: string, error = false) => setNotice({ text, error }),
     [],
@@ -148,7 +153,7 @@ export default function Studio({ user }: { user: User }) {
     const u = new URL(location.href);
     if (id) u.searchParams.set("project", id);
     else u.searchParams.delete("project");
-    navigate("/"+u.search);
+    navigate("/" + u.search);
   }
   function nav(v: View) {
     setView(v);
@@ -623,7 +628,10 @@ export default function Studio({ user }: { user: User }) {
       {account && (
         <div className="account-popover">
           <span>{user.email}</span>
-          <button className="signout-button" onClick={()=>logout().catch(e=>notify(e.message,true))}>
+          <button
+            className="signout-button"
+            onClick={() => logout().catch((e) => notify(e.message, true))}
+          >
             <LogOut size={15} /> Sign out
           </button>
         </div>

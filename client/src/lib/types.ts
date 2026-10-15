@@ -73,4 +73,14 @@ export const statusLabels: Record<Status, string> = {
   approved: "Approved",
 };
 
-export type Poll={id:string;question:string;version_ids:string[];creator_id:string;closed:boolean;my_vote:string|null;counts:Record<string,number>|null;total:number|null;created_at:number};
+export type Poll = {
+  id: string;
+  question: string;
+  version_ids: string[];
+  creator_id: string;
+  closed: boolean;
+  my_vote: string | null;
+  counts: Record<string, number> | null;
+  total: number | null;
+  created_at: number;
+};

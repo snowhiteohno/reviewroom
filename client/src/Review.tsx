@@ -46,7 +46,7 @@ import {
 } from "@/components/studio-ui";
 import BeforeAfter from "@/components/BeforeAfter";
 import DesignVotes from "@/components/DesignVotes";
-import {FeedbackFlow,FixesPanel} from "@/components/FeedbackFlow";
+import { FeedbackFlow, FixesPanel } from "@/components/FeedbackFlow";
 type Props = {
   detail: Detail;
   user: User;
@@ -85,9 +85,11 @@ export default function Review({
     [uploading, setUploading] = useState(false),
     [menu, setMenu] = useState(false),
     [versionPanel, setVersionPanel] = useState(true);
-  const [comparisonMode,setComparisonMode]=useState<"side"|"reveal">("side");
-  const [kind,setKind]=useState<"suggestion"|"must_fix">("suggestion");
-  const blockers=d.blockers||[];
+  const [comparisonMode, setComparisonMode] = useState<"side" | "reveal">(
+    "side",
+  );
+  const [kind, setKind] = useState<"suggestion" | "must_fix">("suggestion");
+  const blockers = d.blockers || [];
   const input = useRef<HTMLInputElement>(null),
     commentInput = useRef<HTMLTextAreaElement>(null);
   const current = d.versions.find((v) => v.id === versionId) || d.versions[0];
@@ -168,7 +170,12 @@ export default function Review({
     if (current)
       mutate(
         d.project.id,
-        { op: "status", versionId: current.id, status, expectedStatus:current.status },
+        {
+          op: "status",
+          versionId: current.id,
+          status,
+          expectedStatus: current.status,
+        },
         {
           draft: "Returned to draft.",
           in_review: "Ready for feedback.",
@@ -379,103 +386,147 @@ export default function Review({
               </button>
             </div>
           </div>
-          {compare&&older&&<div className="comparison-controls"><div className="compare-mode-switch"><button className={comparisonMode==="side"?"active":""} aria-pressed={comparisonMode==="side"} onClick={()=>setComparisonMode("side")}>Side by side</button><button className={comparisonMode==="reveal"?"active":""} aria-pressed={comparisonMode==="reveal"} onClick={()=>setComparisonMode("reveal")}>Reveal changes</button></div>{comparisonMode==="reveal"&&<select aria-label="Before version" value={older.id} onChange={e=>setLeftVersion(e.target.value)}>{d.versions.filter(v=>v.id!==current?.id).map(v=><option key={v.id} value={v.id}>Before: version {v.number}</option>)}</select>}</div>}
+          {compare && older && (
+            <div className="comparison-controls">
+              <div className="compare-mode-switch">
+                <button
+                  className={comparisonMode === "side" ? "active" : ""}
+                  aria-pressed={comparisonMode === "side"}
+                  onClick={() => setComparisonMode("side")}
+                >
+                  Side by side
+                </button>
+                <button
+                  className={comparisonMode === "reveal" ? "active" : ""}
+                  aria-pressed={comparisonMode === "reveal"}
+                  onClick={() => setComparisonMode("reveal")}
+                >
+                  Reveal changes
+                </button>
+              </div>
+              {comparisonMode === "reveal" && (
+                <select
+                  aria-label="Before version"
+                  value={older.id}
+                  onChange={(e) => setLeftVersion(e.target.value)}
+                >
+                  {d.versions
+                    .filter((v) => v.id !== current?.id)
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>
+                        Before: version {v.number}
+                      </option>
+                    ))}
+                </select>
+              )}
+            </div>
+          )}
           {current ? (
             <div className={"canvas-viewport " + (pinMode ? "pin-cursor" : "")}>
-              {compare&&comparisonMode==="reveal"&&older?<BeforeAfter key={older.id+current.id} before={older} after={current}/>:<div
-                className={compare ? "comparison" : "single-design"}
-                style={compare ? {} : { width: zoom * 100 + "%" }}
-              >
-                {compare && older && (
-                  <div className="compare-image">
-                    <div className="compare-label">
-                      <select
-                        aria-label="Compare version"
-                        value={older.id}
-                        onChange={(e) => setLeftVersion(e.target.value)}
-                      >
-                        {d.versions
-                          .filter((v) => v.id !== current.id)
-                          .map((v) => (
-                            <option key={v.id} value={v.id}>
-                              Version {v.number}
-                            </option>
-                          ))}
-                      </select>
-                      <span>{statusLabels[older.status]}</span>
-                    </div>
-                    <img
-                      src={"/api/assets/" + older.id}
-                      alt={"Version " + older.number}
-                    />
-                  </div>
-                )}
-                <div className={compare ? "compare-image" : "design-holder"}>
-                  {compare && (
-                    <div className="compare-label">
-                      <span>Version {current.number}</span>
-                      <span>Selected</span>
+              {compare && comparisonMode === "reveal" && older ? (
+                <BeforeAfter
+                  key={older.id + current.id}
+                  before={older}
+                  after={current}
+                />
+              ) : (
+                <div
+                  className={compare ? "comparison" : "single-design"}
+                  style={compare ? {} : { width: zoom * 100 + "%" }}
+                >
+                  {compare && older && (
+                    <div className="compare-image">
+                      <div className="compare-label">
+                        <select
+                          aria-label="Compare version"
+                          value={older.id}
+                          onChange={(e) => setLeftVersion(e.target.value)}
+                        >
+                          {d.versions
+                            .filter((v) => v.id !== current.id)
+                            .map((v) => (
+                              <option key={v.id} value={v.id}>
+                                Version {v.number}
+                              </option>
+                            ))}
+                        </select>
+                        <span>{statusLabels[older.status]}</span>
+                      </div>
+                      <img
+                        src={"/api/assets/" + older.id}
+                        alt={"Version " + older.number}
+                      />
                     </div>
                   )}
-                  <div className="image-surface" onClick={placePin}>
-                    <img
-                      className="main-design"
-                      src={"/api/assets/" + current.id}
-                      alt={current.file_name}
-                      draggable={false}
-                    />
-                    {!compare &&
-                      roots.map(
-                        (c, i) =>
-                          c.x !== null &&
-                          c.y !== null && (
-                            <button
-                              key={c.id}
-                              className={
-                                "comment-pin " +
-                                (c.resolved ? "resolved " : "") +
-                                (selectedComment === c.id ? "selected" : "")
-                              }
-                              style={{
-                                left: c.x * 100 + "%",
-                                top: c.y * 100 + "%",
-                              }}
-                              aria-label={"Feedback " + (i + 1) + ": " + c.body}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedComment(c.id);
-                                setTab("comments");
-                                setFilter(c.resolved ? "resolved" : "open");
-                                setTimeout(
-                                  () =>
-                                    document
-                                      .getElementById("comment-" + c.id)
-                                      ?.scrollIntoView({
-                                        behavior: "smooth",
-                                        block: "nearest",
-                                      }),
-                                  50,
-                                );
-                              }}
-                            >
-                              {c.resolved ? <Check size={14} /> : i + 1}
-                            </button>
-                          ),
-                      )}
-                    {pin && (
-                      <span
-                        className="comment-pin new-pin"
-                        style={{
-                          left: pin.x * 100 + "%",
-                          top: pin.y * 100 + "%",
-                        }}
-                      >
-                        <Plus size={15} />
-                      </span>
+                  <div className={compare ? "compare-image" : "design-holder"}>
+                    {compare && (
+                      <div className="compare-label">
+                        <span>Version {current.number}</span>
+                        <span>Selected</span>
+                      </div>
                     )}
+                    <div className="image-surface" onClick={placePin}>
+                      <img
+                        className="main-design"
+                        src={"/api/assets/" + current.id}
+                        alt={current.file_name}
+                        draggable={false}
+                      />
+                      {!compare &&
+                        roots.map(
+                          (c, i) =>
+                            c.x !== null &&
+                            c.y !== null && (
+                              <button
+                                key={c.id}
+                                className={
+                                  "comment-pin " +
+                                  (c.resolved ? "resolved " : "") +
+                                  (selectedComment === c.id ? "selected" : "")
+                                }
+                                style={{
+                                  left: c.x * 100 + "%",
+                                  top: c.y * 100 + "%",
+                                }}
+                                aria-label={
+                                  "Feedback " + (i + 1) + ": " + c.body
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedComment(c.id);
+                                  setTab("comments");
+                                  setFilter(c.resolved ? "resolved" : "open");
+                                  setTimeout(
+                                    () =>
+                                      document
+                                        .getElementById("comment-" + c.id)
+                                        ?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "nearest",
+                                        }),
+                                    50,
+                                  );
+                                }}
+                              >
+                                {c.resolved ? <Check size={14} /> : i + 1}
+                              </button>
+                            ),
+                        )}
+                      {pin && (
+                        <span
+                          className="comment-pin new-pin"
+                          style={{
+                            left: pin.x * 100 + "%",
+                            top: pin.y * 100 + "%",
+                          }}
+                        >
+                          <Plus size={15} />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>}
+              )}
               {pinMode && (
                 <div className="pin-instruction">
                   Click a spot on the design, then leave your feedback.
@@ -516,7 +567,9 @@ export default function Review({
           <div className="canvas-bottom">
             <span>
               {compare
-                ? "Side by side comparison"
+                ? comparisonMode === "reveal"
+                  ? "Before and after comparison"
+                  : "Side by side comparison"
                 : current?.file_name || "PNG, JPG, WebP, or GIF"}
             </span>
             {current && !compare && (
@@ -555,8 +608,18 @@ export default function Review({
             >
               Feedback <span>{roots.length}</span>
             </button>
-            <button className={tab==="fixes"?"active":""} onClick={()=>setTab("fixes")}>Fixes <span>{blockers.length}</span></button>
-            <button className={tab==="votes"?"active":""} onClick={()=>setTab("votes")}>Votes <span>{d.polls.length}</span></button>
+            <button
+              className={tab === "fixes" ? "active" : ""}
+              onClick={() => setTab("fixes")}
+            >
+              Fixes <span>{blockers.length}</span>
+            </button>
+            <button
+              className={tab === "votes" ? "active" : ""}
+              onClick={() => setTab("votes")}
+            >
+              Votes <span>{d.polls.length}</span>
+            </button>
             <button
               className={tab === "activity" ? "active" : ""}
               onClick={() => setTab("activity")}
@@ -607,43 +670,51 @@ export default function Review({
                             {roots.indexOf(c) + 1}
                           </span>
                         )}
-                        {c.kind!=="must_fix"&&(canEdit || c.author_id === user.userId) && (
-                          <button
-                            className={
-                              "resolve-btn " + (c.resolved ? "done" : "")
-                            }
-                            title={
-                              c.resolved
-                                ? "Reopen conversation"
-                                : "Resolve conversation"
-                            }
-                            aria-label={
-                              c.resolved
-                                ? "Reopen conversation"
-                                : "Resolve conversation"
-                            }
-                            disabled={busy}
-                            onClick={() =>
-                              mutate(
-                                d.project.id,
-                                {
-                                  op: "resolve",
-                                  versionId: current.id,
-                                  commentId: c.id,
-                                  value: !c.resolved,
-                                },
+                        {c.kind !== "must_fix" &&
+                          (canEdit || c.author_id === user.userId) && (
+                            <button
+                              className={
+                                "resolve-btn " + (c.resolved ? "done" : "")
+                              }
+                              title={
                                 c.resolved
-                                  ? "Conversation reopened."
-                                  : "Conversation resolved.",
-                              )
-                            }
-                          >
-                            <Check size={15} />
-                          </button>
-                        )}
+                                  ? "Reopen conversation"
+                                  : "Resolve conversation"
+                              }
+                              aria-label={
+                                c.resolved
+                                  ? "Reopen conversation"
+                                  : "Resolve conversation"
+                              }
+                              disabled={busy}
+                              onClick={() =>
+                                mutate(
+                                  d.project.id,
+                                  {
+                                    op: "resolve",
+                                    versionId: current.id,
+                                    commentId: c.id,
+                                    value: !c.resolved,
+                                  },
+                                  c.resolved
+                                    ? "Conversation reopened."
+                                    : "Conversation resolved.",
+                                )
+                              }
+                            >
+                              <Check size={15} />
+                            </button>
+                          )}
                       </div>
                       <p>{c.body}</p>
-                      <FeedbackFlow comment={c} detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>
+                      <FeedbackFlow
+                        comment={c}
+                        detail={d}
+                        user={user}
+                        busy={busy}
+                        mutate={mutate}
+                        onVersion={changeVersion}
+                      />
                       {comments
                         .filter((r) => r.parent_id === c.id)
                         .map((r) => (
@@ -721,7 +792,19 @@ export default function Review({
                 )}
               </div>
               <form className="comment-composer" onSubmit={addComment}>
-                <label className="feedback-type-label">Feedback type<select aria-label="Feedback type" value={kind} onChange={e=>setKind(e.target.value as "suggestion"|"must_fix")}><option value="suggestion">Suggestion</option><option value="must_fix">Must fix</option></select></label>
+                <label className="feedback-type-label">
+                  Feedback type
+                  <select
+                    aria-label="Feedback type"
+                    value={kind}
+                    onChange={(e) =>
+                      setKind(e.target.value as "suggestion" | "must_fix")
+                    }
+                  >
+                    <option value="suggestion">Suggestion</option>
+                    <option value="must_fix">Must fix</option>
+                  </select>
+                </label>
                 {pin && (
                   <div className="pin-composer-label">
                     <MapPin size={13} /> Pinned to the design
@@ -763,7 +846,23 @@ export default function Review({
                 </div>
               </form>
             </>
-          ) : tab==="fixes"?<FixesPanel detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: tab==="votes"?<DesignVotes detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: (
+          ) : tab === "fixes" ? (
+            <FixesPanel
+              detail={d}
+              user={user}
+              busy={busy}
+              mutate={mutate}
+              onVersion={changeVersion}
+            />
+          ) : tab === "votes" ? (
+            <DesignVotes
+              detail={d}
+              user={user}
+              busy={busy}
+              mutate={mutate}
+              onVersion={changeVersion}
+            />
+          ) : (
             <div className="review-activity">
               <ActivityList items={d.activity} />
             </div>
@@ -799,7 +898,21 @@ export default function Review({
                         ? "Upload a revision or request another review."
                         : "Request a review when your design is ready."}
               </p>
-              {isLatest&&blockers.length>0&&current.status!=="approved"&&<div className="approval-blockers"><LockKeyhole size={13}/><span>{blockers.length} must fix {blockers.length===1?"item needs":"items need"} verification.</span><button onClick={()=>setTab("fixes")}>Review fixes</button></div>}
+              {isLatest &&
+                blockers.length > 0 &&
+                current.status !== "approved" && (
+                  <div className="approval-blockers">
+                    <LockKeyhole size={13} />
+                    <span>
+                      {blockers.length} must fix{" "}
+                      {blockers.length === 1 ? "item needs" : "items need"}{" "}
+                      verification.
+                    </span>
+                    <button onClick={() => setTab("fixes")}>
+                      Review fixes
+                    </button>
+                  </div>
+                )}
               {isLatest && (
                 <>
                   {current.status === "in_review" && d.role !== "editor" ? (
@@ -813,7 +926,7 @@ export default function Review({
                       </button>
                       <button
                         className="button sage-button"
-                        disabled={busy||blockers.length>0}
+                        disabled={busy || blockers.length > 0}
                         onClick={() => statusChange("approved")}
                       >
                         <Check size={15} /> Approve

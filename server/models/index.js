@@ -1,21 +1,183 @@
 import mongoose from "mongoose";
-import {randomUUID} from "node:crypto";
-const {Schema}=mongoose;
-const id={type:String,default:()=>randomUUID()};
-const options={timestamps:true,versionKey:false};
-const reference=(ref,required=true)=>({type:String,ref,required});
-const userSchema=new Schema({_id:id,displayName:{type:String,required:true,trim:true,maxLength:60},email:{type:String,required:true,trim:true,lowercase:true,unique:true},passwordHash:{type:String,required:true,select:false},studioInitialized:{type:Boolean,default:false}},options);
-const sessionSchema=new Schema({_id:id,userId:reference("User"),expiresAt:{type:Date,required:true,index:{expires:0}}},options);
-const memberSchema=new Schema({_id:id,email:{type:String,required:true,lowercase:true},role:{type:String,enum:["editor","reviewer"],required:true}},{versionKey:false});
-const projectSchema=new Schema({_id:id,ownerId:reference("User"),name:{type:String,required:true,trim:true,maxLength:80},description:{type:String,default:"",maxLength:500},category:{type:String,enum:["Branding","Web design","Packaging","Editorial","Illustration","Other"],default:"Branding"},color:{type:String,enum:["rose","sage","lavender","peach","yellow"],default:"rose"},members:[memberSchema],archived:{type:Boolean,default:false},sample:{type:Boolean,default:false},versionCounter:{type:Number,default:0},latestVersionId:reference("Version",false),revision:{type:Number,default:0}},options);
-projectSchema.index({ownerId:1,updatedAt:-1});projectSchema.index({"members.email":1});
-const versionSchema=new Schema({_id:id,projectId:reference("Project"),number:{type:Number,required:true,min:1},fileKey:{type:String,required:true},fileName:{type:String,required:true},mime:{type:String,required:true},width:{type:Number,required:true},height:{type:Number,required:true},status:{type:String,enum:["draft","in_review","changes_requested","approved"],default:"draft"}},options);
-versionSchema.index({projectId:1,number:1},{unique:true});
-const commentSchema=new Schema({_id:id,projectId:reference("Project"),versionId:reference("Version"),authorId:reference("User"),authorName:{type:String,required:true},body:{type:String,required:true,maxLength:3000},x:{type:Number,min:0,max:1,default:null},y:{type:Number,min:0,max:1,default:null},parentId:{...reference("Comment",false),default:null},kind:{type:String,enum:["suggestion","must_fix"],default:"suggestion"},resolution:{type:String,enum:["open","addressed","verified"],default:"open"},resolved:{type:Boolean,default:false},addressedVersionId:{...reference("Version",false),default:null},addressedBy:{...reference("User",false),default:null},verifiedBy:{...reference("User",false),default:null}},options);
-commentSchema.index({projectId:1,parentId:1,kind:1,resolution:1});commentSchema.index({versionId:1,createdAt:1});
-const activitySchema=new Schema({_id:id,projectId:reference("Project"),actor:{type:String,required:true},body:{type:String,required:true}},options);activitySchema.index({projectId:1,createdAt:-1});
-const favoriteSchema=new Schema({_id:id,projectId:reference("Project"),userId:reference("User")},options);favoriteSchema.index({projectId:1,userId:1},{unique:true});
-const pollSchema=new Schema({_id:id,projectId:reference("Project"),creatorId:reference("User"),question:{type:String,required:true,maxLength:150},versionIds:{type:[String],required:true,validate:v=>v.length>=2&&v.length<=3&&new Set(v).size===v.length},closed:{type:Boolean,default:false}},options);pollSchema.index({projectId:1,createdAt:-1});
-const voteSchema=new Schema({_id:id,pollId:reference("Poll"),userId:reference("User"),versionId:reference("Version")},options);voteSchema.index({pollId:1,userId:1},{unique:true});
-export const User=mongoose.model("User",userSchema),Session=mongoose.model("Session",sessionSchema),Project=mongoose.model("Project",projectSchema),Version=mongoose.model("Version",versionSchema),Comment=mongoose.model("Comment",commentSchema),Activity=mongoose.model("Activity",activitySchema),Favorite=mongoose.model("Favorite",favoriteSchema),Poll=mongoose.model("Poll",pollSchema),Vote=mongoose.model("Vote",voteSchema);
-export const models=[User,Session,Project,Version,Comment,Activity,Favorite,Poll,Vote];
+import { randomUUID } from "node:crypto";
+const { Schema } = mongoose;
+const id = { type: String, default: () => randomUUID() };
+const options = { timestamps: true, versionKey: false };
+const reference = (ref, required = true) => ({ type: String, ref, required });
+const userSchema = new Schema(
+  {
+    _id: id,
+    displayName: { type: String, required: true, trim: true, maxLength: 60 },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      unique: true,
+    },
+    passwordHash: { type: String, required: true, select: false },
+    studioInitialized: { type: Boolean, default: false },
+  },
+  options,
+);
+const sessionSchema = new Schema(
+  {
+    _id: id,
+    userId: reference("User"),
+    expiresAt: { type: Date, required: true, index: { expires: 0 } },
+  },
+  options,
+);
+const memberSchema = new Schema(
+  {
+    _id: id,
+    email: { type: String, required: true, lowercase: true },
+    role: { type: String, enum: ["editor", "reviewer"], required: true },
+  },
+  { versionKey: false },
+);
+const projectSchema = new Schema(
+  {
+    _id: id,
+    ownerId: reference("User"),
+    name: { type: String, required: true, trim: true, maxLength: 80 },
+    description: { type: String, default: "", maxLength: 500 },
+    category: {
+      type: String,
+      enum: [
+        "Branding",
+        "Web design",
+        "Packaging",
+        "Editorial",
+        "Illustration",
+        "Other",
+      ],
+      default: "Branding",
+    },
+    color: {
+      type: String,
+      enum: ["rose", "sage", "lavender", "peach", "yellow"],
+      default: "rose",
+    },
+    members: [memberSchema],
+    archived: { type: Boolean, default: false },
+    sample: { type: Boolean, default: false },
+    versionCounter: { type: Number, default: 0 },
+    latestVersionId: reference("Version", false),
+    revision: { type: Number, default: 0 },
+  },
+  options,
+);
+projectSchema.index({ ownerId: 1, updatedAt: -1 });
+projectSchema.index({ "members.email": 1 });
+const versionSchema = new Schema(
+  {
+    _id: id,
+    projectId: reference("Project"),
+    number: { type: Number, required: true, min: 1 },
+    fileKey: { type: String, required: true },
+    fileName: { type: String, required: true },
+    mime: { type: String, required: true },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["draft", "in_review", "changes_requested", "approved"],
+      default: "draft",
+    },
+  },
+  options,
+);
+versionSchema.index({ projectId: 1, number: 1 }, { unique: true });
+const commentSchema = new Schema(
+  {
+    _id: id,
+    projectId: reference("Project"),
+    versionId: reference("Version"),
+    authorId: reference("User"),
+    authorName: { type: String, required: true },
+    body: { type: String, required: true, maxLength: 3000 },
+    x: { type: Number, min: 0, max: 1, default: null },
+    y: { type: Number, min: 0, max: 1, default: null },
+    parentId: { ...reference("Comment", false), default: null },
+    kind: {
+      type: String,
+      enum: ["suggestion", "must_fix"],
+      default: "suggestion",
+    },
+    resolution: {
+      type: String,
+      enum: ["open", "addressed", "verified"],
+      default: "open",
+    },
+    resolved: { type: Boolean, default: false },
+    addressedVersionId: { ...reference("Version", false), default: null },
+    addressedBy: { ...reference("User", false), default: null },
+    verifiedBy: { ...reference("User", false), default: null },
+  },
+  options,
+);
+commentSchema.index({ projectId: 1, parentId: 1, kind: 1, resolution: 1 });
+commentSchema.index({ versionId: 1, createdAt: 1 });
+const activitySchema = new Schema(
+  {
+    _id: id,
+    projectId: reference("Project"),
+    actor: { type: String, required: true },
+    body: { type: String, required: true },
+  },
+  options,
+);
+activitySchema.index({ projectId: 1, createdAt: -1 });
+const favoriteSchema = new Schema(
+  { _id: id, projectId: reference("Project"), userId: reference("User") },
+  options,
+);
+favoriteSchema.index({ projectId: 1, userId: 1 }, { unique: true });
+const pollSchema = new Schema(
+  {
+    _id: id,
+    projectId: reference("Project"),
+    creatorId: reference("User"),
+    question: { type: String, required: true, maxLength: 150 },
+    versionIds: {
+      type: [String],
+      required: true,
+      validate: (v) =>
+        v.length >= 2 && v.length <= 3 && new Set(v).size === v.length,
+    },
+    closed: { type: Boolean, default: false },
+  },
+  options,
+);
+pollSchema.index({ projectId: 1, createdAt: -1 });
+const voteSchema = new Schema(
+  {
+    _id: id,
+    pollId: reference("Poll"),
+    userId: reference("User"),
+    versionId: reference("Version"),
+  },
+  options,
+);
+voteSchema.index({ pollId: 1, userId: 1 }, { unique: true });
+export const User = mongoose.model("User", userSchema),
+  Session = mongoose.model("Session", sessionSchema),
+  Project = mongoose.model("Project", projectSchema),
+  Version = mongoose.model("Version", versionSchema),
+  Comment = mongoose.model("Comment", commentSchema),
+  Activity = mongoose.model("Activity", activitySchema),
+  Favorite = mongoose.model("Favorite", favoriteSchema),
+  Poll = mongoose.model("Poll", pollSchema),
+  Vote = mongoose.model("Vote", voteSchema);
+export const models = [
+  User,
+  Session,
+  Project,
+  Version,
+  Comment,
+  Activity,
+  Favorite,
+  Poll,
+  Vote,
+];

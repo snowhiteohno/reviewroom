@@ -1,10 +1,20 @@
 import mongoose from "mongoose";
-import {loadConfig} from "./config/index.js";
-import {connectDatabase} from "./config/database.js";
-import {createApp} from "./app.js";
-import {mkdir} from "node:fs/promises";
-const config=loadConfig();
-await mkdir(config.uploadDir,{recursive:true});
+import { loadConfig } from "./config/index.js";
+import { connectDatabase } from "./config/database.js";
+import { createApp } from "./app.js";
+import { mkdir } from "node:fs/promises";
+const config = loadConfig();
+await mkdir(config.uploadDir, { recursive: true });
 await connectDatabase(config.mongoUri);
-const app=createApp(config),server=app.listen(config.port,"127.0.0.1",()=>console.log("ReviewRoom API is ready at http://127.0.0.1:"+config.port));
-for(const signal of ["SIGINT","SIGTERM"])process.once(signal,()=>{server.close(async()=>{await mongoose.disconnect();process.exit(0)});setTimeout(()=>process.exit(1),5000).unref()});
+const app = createApp(config),
+  server = app.listen(config.port, config.host, () =>
+    console.log("ReviewRoom API is ready at http://127.0.0.1:" + config.port),
+  );
+for (const signal of ["SIGINT", "SIGTERM"])
+  process.once(signal, () => {
+    server.close(async () => {
+      await mongoose.disconnect();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000).unref();
+  });
