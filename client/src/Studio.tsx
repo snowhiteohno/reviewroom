@@ -40,8 +40,11 @@ import {
   categories,
 } from "@/components/studio-ui";
 import Review from "./Review";
+import {projectAction} from "./lib/api";
+import {useAuth} from "./lib/auth";
 type View = "all" | "shared" | "starred" | "activity" | "archive";
 export default function Studio({ user }: { user: User }) {
+ const {logout}=useAuth();
   const [projects, setProjects] = useState<Project[]>([]),
     [activity, setActivity] = useState<Activity[]>([]),
     [loading, setLoading] = useState(true),
@@ -159,7 +162,7 @@ export default function Studio({ user }: { user: User }) {
   async function mutate(id: string, body: unknown, message?: string) {
     setBusy(true);
     try {
-      await post("/api/projects/" + id, body);
+      await projectAction(id, body);
       await Promise.all([
         refresh(),
         id === selected ? reloadDetail() : Promise.resolve(),
@@ -622,9 +625,9 @@ export default function Studio({ user }: { user: User }) {
       {account && (
         <div className="account-popover">
           <span>{user.email}</span>
-          <a href="/signout-with-chatgpt?return_to=/" target="_top">
+          <button className="signout-button" onClick={()=>logout().catch(e=>notify(e.message,true))}>
             <LogOut size={15} /> Sign out
-          </a>
+          </button>
         </div>
       )}
       {notice && (
@@ -649,7 +652,7 @@ export default function Studio({ user }: { user: User }) {
           onSubmit={async (values) => {
             setBusy(true);
             try {
-              const created = await post<{ id: string }>("/api/studio", {
+              const created = await post<{ id: string }>("/api/projects", {
                 op: "create",
                 ...values,
                 file: undefined,

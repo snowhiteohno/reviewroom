@@ -48,6 +48,7 @@ export async function request<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const res = await fetch(url, {
+    credentials:"include",
     ...options,
     headers:
       options.body instanceof FormData
@@ -55,6 +56,7 @@ export async function request<T>(
         : { "Content-Type": "application/json", ...options.headers },
   });
   const data = (await res.json()) as T & { error?: string };
+  if(res.status===401)window.dispatchEvent(new Event("reviewroom:unauthorized"));
   if (!res.ok)
     throw new Error(data.error || "Something went wrong. Please try again.");
   return data;
