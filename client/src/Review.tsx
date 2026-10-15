@@ -44,6 +44,7 @@ import {
   date,
   relative,
 } from "@/components/studio-ui";
+import DesignVotes from "@/components/DesignVotes";
 import {FeedbackFlow,FixesPanel} from "@/components/FeedbackFlow";
 type Props = {
   detail: Detail;
@@ -552,6 +553,7 @@ export default function Review({
               Feedback <span>{roots.length}</span>
             </button>
             <button className={tab==="fixes"?"active":""} onClick={()=>setTab("fixes")}>Fixes <span>{blockers.length}</span></button>
+            <button className={tab==="votes"?"active":""} onClick={()=>setTab("votes")}>Votes <span>{d.polls.length}</span></button>
             <button
               className={tab === "activity" ? "active" : ""}
               onClick={() => setTab("activity")}
@@ -758,7 +760,7 @@ export default function Review({
                 </div>
               </form>
             </>
-          ) : tab==="fixes"?<FixesPanel detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: (
+          ) : tab==="fixes"?<FixesPanel detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: tab==="votes"?<DesignVotes detail={d} user={user} busy={busy} mutate={mutate} onVersion={changeVersion}/>: (
             <div className="review-activity">
               <ActivityList items={d.activity} />
             </div>
