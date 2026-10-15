@@ -427,3 +427,74 @@ test("sample studios initialize once even when requests arrive together", async 
     6,
   );
 });
+
+test("GridFS keeps private uploads available to a fresh server instance", async () => {
+  const secret = "test-only-secret-" + suffix + suffix;
+  const config = {
+    secret,
+    production: false,
+    origins: new Set(["http://localhost:5174"]),
+    uploadDir: path.join(uploads, "no-filesystem-needed"),
+    uploadStorage: "gridfs",
+  };
+  const first = createApp(config),
+    cookie = owner.cookie.split(";")[0];
+  const created = await supertest(first)
+    .post("/api/projects")
+    .set("Cookie", cookie)
+    .send({ name: "Durable uploads" })
+    .expect(201);
+  const png = await sharp({
+    create: { width: 180, height: 120, channels: 3, background: "#d1b1b8" },
+  })
+    .png()
+    .toBuffer();
+  const uploaded = await supertest(first)
+    .post("/api/projects/" + created.body.id + "/upload")
+    .set("Cookie", cookie)
+    .attach("file", png, "design.png")
+    .expect(201);
+  const v = await Version.findById(uploaded.body.id);
+  assert.match(v.fileKey, /^gridfs:[a-f0-9]{24}$/);
+  const record = await mongoose.connection.db
+    .collection("designs.files")
+    .findOne({ "metadata.versionId": v._id });
+  assert.ok(record);
+  assert.equal(record.length, png.length);
+  const second = createApp(config);
+  const asset = await supertest(second)
+    .get("/api/assets/" + v._id)
+    .set("Cookie", cookie)
+    .expect(200);
+  assert.equal(asset.headers["content-type"], "image/png");
+  assert.match(asset.headers["cache-control"], /private/);
+  assert.deepEqual(asset.body, png);
+  const download = await supertest(second)
+    .get("/api/assets/" + v._id + "?download=1")
+    .set("Cookie", cookie)
+    .expect(200);
+  assert.match(download.headers["content-disposition"], /attachment/);
+  assert.deepEqual(download.body, png);
+  await stranger.agent.get("/api/assets/" + v._id).expect(403);
+  await supertest(second)
+    .get("/api/assets/" + v._id)
+    .expect(401);
+  const { deleteAsset } = await import("../server/services/assets.js");
+  await deleteAsset(config, v.fileKey);
+  assert.equal(
+    await mongoose.connection.db
+      .collection("designs.files")
+      .countDocuments({ _id: record._id }),
+    0,
+  );
+  assert.equal(
+    await mongoose.connection.db
+      .collection("designs.chunks")
+      .countDocuments({ files_id: record._id }),
+    0,
+  );
+  await supertest(second)
+    .get("/api/assets/" + v._id)
+    .set("Cookie", cookie)
+    .expect(404);
+});

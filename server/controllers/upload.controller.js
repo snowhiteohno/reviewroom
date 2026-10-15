@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { writeFile, unlink } from "node:fs/promises";
-import path from "node:path";
 import sharp from "sharp";
+import { saveAsset, deleteAsset, sendAsset } from "../services/assets.js";
 import { Version } from "../models/index.js";
 import {
   access,
@@ -39,10 +38,13 @@ export function uploadController(config) {
           400,
           "Please upload a PNG, JPG, WebP, or GIF image.",
         );
-      const id = randomUUID(),
-        fileKey = id + "." + metadata.format,
-        filePath = path.join(config.uploadDir, fileKey);
-      await writeFile(filePath, req.file.buffer, { flag: "wx", mode: 0o600 });
+      const id = randomUUID();
+      const fileKey = await saveAsset(config, {
+        id,
+        format: metadata.format,
+        buffer: req.file.buffer,
+        mime,
+      });
       try {
         await changeProject(
           req.params.id,
@@ -75,7 +77,7 @@ export function uploadController(config) {
           },
         );
       } catch (error) {
-        await unlink(filePath).catch(() => {});
+        await deleteAsset(config, fileKey).catch(() => {});
         throw error;
       }
       res.status(201).json({ id });
@@ -90,20 +92,7 @@ export function uploadController(config) {
           throw new ApiError(404, "This file could not be found.");
         return res.redirect("/samples/" + key + ".svg");
       }
-      res.set({
-        "Content-Type": v.mime,
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      });
-      if (req.query.download === "1")
-        return res.download(
-          path.join(config.uploadDir, v.fileKey),
-          v.fileName,
-          { dotfiles: "allow" },
-        );
-      res.sendFile(path.join(config.uploadDir, v.fileKey), {
-        dotfiles: "allow",
-      });
+      await sendAsset(config, v, req, res);
     },
   };
 }

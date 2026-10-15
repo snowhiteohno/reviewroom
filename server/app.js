@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import path from "node:path";
@@ -13,6 +14,7 @@ import { errorHandler } from "./utils/errors.js";
 export function createApp(config) {
   const app = express();
   app.disable("x-powered-by");
+  if (config.trustProxy) app.set("trust proxy", config.trustProxy);
   app.use(
     helmet({ contentSecurityPolicy: config.production ? undefined : false }),
   );
@@ -23,7 +25,10 @@ export function createApp(config) {
     res.set("Cache-Control", "no-store");
     next();
   });
-  app.get("/api/health", (req, res) => res.json({ ok: true }));
+  app.get("/api/health", (req, res) => {
+    const ok = mongoose.connection.readyState === 1;
+    res.status(ok ? 200 : 503).json({ ok });
+  });
   app.use("/api/auth", authRoutes(config));
   app.use("/api/projects", authenticate(config));
   app.use("/api/projects", pollRoutes(config));

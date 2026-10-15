@@ -4,7 +4,8 @@ import { connectDatabase } from "./config/database.js";
 import { createApp } from "./app.js";
 import { mkdir } from "node:fs/promises";
 const config = loadConfig();
-await mkdir(config.uploadDir, { recursive: true });
+if (config.uploadStorage === "filesystem")
+  await mkdir(config.uploadDir, { recursive: true });
 await connectDatabase(config.mongoUri);
 const app = createApp(config),
   server = app.listen(config.port, config.host, () =>
