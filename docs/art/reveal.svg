@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+  <title id="title">Before and after reveal</title>
+  <desc id="desc">One frame shows version 1 on the left of a draggable divider and version 2 on the right, so the change is revealed as the divider moves. It works with mouse, touch and arrow keys.</desc>
+  <defs>
+    <style>
+      .serif { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+      .sans { font-family: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif; }
+    </style>
+    <clipPath id="frame"><rect x="60" y="152" width="1080" height="216" rx="18"/></clipPath>
+    <clipPath id="before"><rect x="60" y="152" width="560" height="216"/></clipPath>
+    <clipPath id="after"><rect x="620" y="152" width="520" height="216"/></clipPath>
+  </defs>
+
+  <rect x="20" y="20" width="1160" height="400" rx="28" fill="#faf8f4" stroke="#e9e3db" stroke-width="2"/>
+
+  <text x="60" y="88" class="serif" font-size="36" fill="#443c38">Drag to see what changed<tspan fill="#a85968">.</tspan></text>
+  <text x="60" y="120" class="sans" font-size="16" fill="#8a817a">Mouse, touch, or arrow keys. Different proportions share one frame without stretching.</text>
+
+  <g clip-path="url(#frame)">
+    <!-- version 1 -->
+    <g clip-path="url(#before)">
+      <rect x="60" y="152" width="1080" height="216" fill="#f5f1eb"/>
+      <text x="440" y="276" class="serif" font-size="54" fill="#8a817a" text-anchor="middle">flora</text>
+      <text x="440" y="302" class="sans" font-size="10" letter-spacing="3" fill="#b2a9a1" text-anchor="middle">FLOWER STUDIO</text>
+      <g fill="none" stroke="#b2a9a1" stroke-width="2.4" stroke-linecap="round">
+        <path d="M260 330C256 300 262 270 258 230"/>
+        <path d="M258 290C248 282 240 284 236 290C244 296 252 294 258 290"/>
+        <path d="M260 262C270 254 278 256 282 262C274 268 266 266 260 262"/>
+      </g>
+    </g>
+
+    <!-- version 2 -->
+    <g clip-path="url(#after)">
+      <rect x="60" y="152" width="1080" height="216" fill="#f2e4e5"/>
+      <text x="800" y="290" class="serif" font-size="92" fill="#a85968" text-anchor="middle">flora</text>
+      <text x="800" y="324" class="sans" font-size="12" letter-spacing="5" fill="#a85968" text-anchor="middle">FLOWER STUDIO</text>
+      <g transform="translate(1010 262)">
+        <g fill="#fffefa">
+          <ellipse cx="0" cy="-30" rx="17" ry="28"/>
+          <ellipse cx="0" cy="-30" rx="17" ry="28" transform="rotate(72)"/>
+          <ellipse cx="0" cy="-30" rx="17" ry="28" transform="rotate(144)"/>
+          <ellipse cx="0" cy="-30" rx="17" ry="28" transform="rotate(216)"/>
+          <ellipse cx="0" cy="-30" rx="17" ry="28" transform="rotate(288)"/>
+        </g>
+        <circle r="13" fill="#c96f72"/>
+      </g>
+    </g>
+  </g>
+
+  <rect x="60" y="152" width="1080" height="216" rx="18" fill="none" stroke="#e9e3db" stroke-width="2"/>
+
+  <g class="sans" font-size="12" font-weight="700" letter-spacing="1.5">
+    <rect x="80" y="170" width="96" height="26" rx="13" fill="#fffefa"/>
+    <text x="128" y="187" fill="#8a817a" text-anchor="middle">VERSION 1</text>
+    <rect x="1024" y="170" width="96" height="26" rx="13" fill="#fffefa"/>
+    <text x="1072" y="187" fill="#a85968" text-anchor="middle">VERSION 2</text>
+  </g>
+
+  <!-- divider -->
+  <line x1="620" y1="152" x2="620" y2="368" stroke="#fffefa" stroke-width="4"/>
+  <circle cx="620" cy="260" r="24" fill="#fffefa" stroke="#e9e3db" stroke-width="2"/>
+  <path d="M612 252L604 260L612 268M628 252L636 260L628 268" fill="none" stroke="#443c38" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="60" y="398" class="sans" font-size="14" fill="#8a817a">Pick any two revisions under Compare, then switch to Reveal changes.</text>
+</svg>
